@@ -165,7 +165,7 @@ const ShipmentDetailsModal = ({ shipment, onClose, onViewDocument }) => {
               </circle>
               <image 
                 href={shipment.cargo === 'Pharmaceuticals' ? semiIcon : truckIcon}
-                x="-8" y="-8" width="16" height="16"
+                x="-14" y="-14" width="28" height="28"
               />
               <text x="0" y="26" textAnchor="middle" fill="#00ff41" fontSize="9" fontWeight="700">
                 {shipment.truck}
