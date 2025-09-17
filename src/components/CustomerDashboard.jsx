@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DocumentViewer from './DocumentViewer';
 import logoImage from '../imgs/FreightTrixHeader_Graphic.png';
 import truckIcon from '../imgs/freighTrixTruckIcon.png';
 import semiIcon from '../imgs/freighTrixMapSemiIcon.png';
@@ -14,6 +15,9 @@ const CustomerDashboard = ({ userData, onLogout }) => {
     delivered: 4,
     fleetUtilization: 87
   });
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState(null);
+  const [documentType, setDocumentType] = useState('');
 
   // Mock shipment data
   const mockShipments = [
@@ -92,6 +96,67 @@ const CustomerDashboard = ({ userData, onLogout }) => {
   const handleShipmentSelect = (shipment) => {
     setSelectedShipment(shipment);
     setActiveView('shipment');
+  };
+
+  const handleViewDocument = (type, shipment) => {
+    const mockDocuments = {
+      'FT-2024-1247': {
+        bol: {
+          signed: true,
+          timestamp: '2024-12-13T08:15:00Z',
+          signedBy: 'Marcus Rodriguez',
+          url: '/docs/FTRXExampleBOL.pdf', // Changed to PDF
+          type: 'application/pdf'
+        },
+        photos: [
+          {
+            type: 'loading',
+            timestamp: '2024-12-13T08:20:00Z',
+            url: '/imgs/trackersImg.jpeg',
+            description: 'Temperature sensor verification before loading'
+          },
+          {
+            type: 'loading',
+            timestamp: '2024-12-13T08:22:00Z',
+            url: '/docs/LinkedInPhotosOfShipment.pdf', // Changed to PDF
+            description: 'Complete shipment photo documentation'
+          },
+          {
+            type: 'seal',
+            timestamp: '2024-12-13T08:25:00Z',
+            url: '/imgs/trackersImg.jpeg',
+            description: 'Trailer door seals verification'
+          },
+          {
+            type: 'temperature',
+            timestamp: '2024-12-13T08:26:00Z',
+            url: '/imgs/trackersImg.jpeg',
+            description: 'Temperature monitoring equipment setup'
+          }
+        ],
+        temperature: [
+          { time: '08:00', temp: 4.1, target: 4.0 },
+          { time: '09:00', temp: 4.3, target: 4.0 },
+          { time: '10:00', temp: 3.9, target: 4.0 },
+          { time: '11:00', temp: 4.2, target: 4.0 },
+          { time: '12:00', temp: 4.0, target: 4.0 },
+          { time: '13:00', temp: 4.4, target: 4.0 },
+          { time: '14:00', temp: 4.1, target: 4.0 },
+          { time: '15:00', temp: 4.2, target: 4.0 },
+        ]
+      }
+    };
+    const shipmentDocs = mockDocuments[shipment.id];
+    if (!shipmentDocs) return;
+    setCurrentDocument(shipmentDocs[type]);
+    setDocumentType(type);
+    setShowDocumentViewer(true);
+  };
+
+  const handleCloseDocumentViewer = () => {
+    setShowDocumentViewer(false);
+    setCurrentDocument(null);
+    setDocumentType('');
   };
 
   const renderFleetOverview = () => (
@@ -194,7 +259,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   {/* Truck icon using actual images */}
                   <image 
                     href={isSemi ? semiIcon : truckIcon}
-                    x="-12" y="-12" width="24" height="24"
+                    x="-20" y="-20" width="40" height="40"
                     style={{cursor: 'pointer', filter: shipment.onTime ? 'none' : 'hue-rotate(180deg)'}}
                     onClick={() => handleShipmentSelect(shipment)}
                   />
@@ -202,13 +267,13 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   {/* Pulse animation for active shipment */}
                   {index === 0 && (
                     <circle 
-                      cx="0" cy="0" r="20" 
+                      cx="0" cy="0" r="25" 
                       fill="none" 
                       stroke="#00ff41" 
                       strokeWidth="2" 
                       opacity="0.6"
                     >
-                      <animate attributeName="r" values="20;30;20" dur="2s" repeatCount="indefinite"/>
+                      <animate attributeName="r" values="25;35;25" dur="2s" repeatCount="indefinite"/>
                       <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
                     </circle>
                   )}
@@ -273,14 +338,14 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                 <g key={`fleet-truck-${i}`} transform={`translate(${x}, ${y})`}>
                   <image 
                     href={isSemi ? semiIcon : truckIcon}
-                    x="-8" y="-8" width="16" height="16"
+                    x="-14" y="-14" width="28" height="28"
                     style={{
                       opacity: status ? 1 : 0.4,
                       filter: status ? 'none' : 'grayscale(1)'
                     }}
                   />
                   <text 
-                    x="0" y="18" 
+                    x="0" y="20" 
                     fill={status ? '#00ff41' : '#666'} 
                     fontSize="7" 
                     textAnchor="middle"
@@ -297,14 +362,14 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <rect x="0" y="0" width="170" height="120" fill="rgba(0, 0, 0, 0.7)" stroke="#00ff41" strokeWidth="1" rx="8"/>
               <text x="10" y="18" fill="#00ff41" fontSize="12" fontWeight="700">Fleet Status</text>
               
-              <image href={semiIcon} x="10" y="28" width="16" height="16"/>
-              <text x="32" y="40" fill="#e0e0e0" fontSize="9">Semi Trucks (Active)</text>
+              <image href={semiIcon} x="10" y="28" width="24" height="24"/>
+              <text x="38" y="42" fill="#e0e0e0" fontSize="9">Semi Trucks (Active)</text>
               
-              <image href={truckIcon} x="10" y="48" width="16" height="16"/>
-              <text x="32" y="60" fill="#e0e0e0" fontSize="9">Box Trucks (Active)</text>
+              <image href={truckIcon} x="10" y="50" width="24" height="24"/>
+              <text x="38" y="64" fill="#e0e0e0" fontSize="9">Box Trucks (Active)</text>
               
-              <image href={truckIcon} x="10" y="68" width="16" height="16" style={{opacity: 0.4, filter: 'grayscale(1)'}}/>
-              <text x="32" y="80" fill="#666" fontSize="9">Inactive/Maintenance</text>
+              <image href={truckIcon} x="10" y="72" width="24" height="24" style={{opacity: 0.4, filter: 'grayscale(1)'}}/>
+              <text x="38" y="86" fill="#666" fontSize="9">Inactive/Maintenance</text>
               
               <circle cx="16" cy="95" r="10" fill="none" stroke="#00ff41" strokeWidth="2"/>
               <text x="32" y="100" fill="#e0e0e0" fontSize="9">Live Tracking</text>
@@ -609,7 +674,11 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   <div style={styles.documentName}>Bill of Lading</div>
                   <div style={styles.documentStatus}>Signed & Verified</div>
                 </div>
-                <button style={styles.documentAction}>View</button>
+                <button
+                  style={styles.documentAction}
+                  onClick={() => handleViewDocument('bol', selectedShipment)}>
+                  View
+                </button>
               </div>
 
               <div style={styles.documentItem}>
@@ -623,7 +692,11 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   <div style={styles.documentName}>Cargo Photos</div>
                   <div style={styles.documentStatus}>Loading & Seal Images</div>
                 </div>
-                <button style={styles.documentAction}>View</button>
+                <button
+                  style={styles.documentAction}
+                  onClick={() => handleViewDocument('photos', selectedShipment)}>
+                  View
+                </button>
               </div>
 
               <div style={styles.documentItem}>
@@ -636,7 +709,11 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   <div style={styles.documentName}>Temperature Log</div>
                   <div style={styles.documentStatus}>Continuous Monitoring</div>
                 </div>
-                <button style={styles.documentAction}>View</button>
+                <button
+                  style={styles.documentAction}
+                  onClick={() => handleViewDocument('temperature', selectedShipment)}>
+                  View
+                </button>
               </div>
             </div>
           </div>
@@ -736,6 +813,14 @@ const CustomerDashboard = ({ userData, onLogout }) => {
       <div style={styles.mainContent}>
         {activeView === 'fleet' ? renderFleetOverview() : renderShipmentDetails()}
       </div>
+
+      {showDocumentViewer && (
+        <DocumentViewer
+          document={currentDocument}
+          type={documentType}
+          onClose={handleCloseDocumentViewer}
+        />
+      )}
 
       <style>
         {`
