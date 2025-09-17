@@ -1,0 +1,76 @@
+.CustomerApp {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+  
+  /* Global scrollbar styling for customer portal */
+  .CustomerApp ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .CustomerApp ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+  
+  .CustomerApp ::-webkit-scrollbar-thumb {
+    background: rgba(0, 255, 65, 0.3);
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+  
+  .CustomerApp ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 255, 65, 0.5);
+  }
+  
+  /* Enhanced input focus states */
+  .CustomerApp input:focus {
+    border-color: #00ff41 !important;
+    box-shadow: 0 0 0 2px rgba(0, 255, 65, 0.2) !important;
+    outline: none;
+  }
+  
+  /* Enhanced button hover states */
+  .CustomerApp button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 255, 65, 0.3);
+  }
+  
+  .CustomerApp button:active:not(:disabled) {
+    transform: translateY(0);
+  }
+  
+  /* Loading animation utilities */
+  @keyframes customerSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .customer-loading {
+    animation: customerSpin 1s linear infinite;
+  }
+  
+  /* Responsive utilities for customer portal */
+  @media (max-width: 768px) {
+    .CustomerApp .stats-grid {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+    
+    .CustomerApp .details-grid {
+      grid-template-columns: 1fr !important;
+    }
+    
+    .CustomerApp .feature-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .CustomerApp .stats-grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
