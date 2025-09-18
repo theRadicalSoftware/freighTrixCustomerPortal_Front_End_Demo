@@ -309,6 +309,11 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
           zoom: mapZoom
         });
 
+        // Store map reference for zoom controls (add this line)
+        if (isFleetView) {
+          window.currentFleetMap = map;
+        }
+
         // Apply dark theme styling
         map.on('load', () => {
           const mapCanvas = map.getCanvas();
@@ -510,6 +515,37 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
             } catch (error) {
               console.warn('Error adding markers:', error);
             }
+          } else {
+            // For fleet view, trigger truck positioning
+            window.positionFleetTrucks = () => {
+              setTimeout(() => {
+                const trucks = document.querySelectorAll('[data-shipment-id]');
+                trucks.forEach(truck => {
+                  const lat = parseFloat(truck.getAttribute('data-lat'));
+                  const lng = parseFloat(truck.getAttribute('data-lng'));
+                            
+                  if (lat && lng) {
+                    try {
+                      const point = map.project([lng, lat]);
+                      truck.style.left = `${point.x}px`;
+                      truck.style.top = `${point.y}px`;
+                      truck.style.position = 'absolute';
+                      truck.style.transform = 'translate(-50%, -50%)';
+                      truck.style.pointerEvents = 'auto';
+                    } catch (error) {
+                      console.warn('Error positioning truck:', error);
+                    }
+                  }
+                });
+              }, 100);
+            };
+        
+            // Position trucks initially
+            window.positionFleetTrucks();
+        
+            // Reposition on map move/zoom
+            map.on('move', window.positionFleetTrucks);
+            map.on('zoom', window.positionFleetTrucks);
           }
         });
 
@@ -530,6 +566,18 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
     return () => {
       if (mapInstanceRef.current) {
         try {
+          // Clean up map event listeners for fleet view
+          if (isFleetView && window.positionFleetTrucks) {
+            mapInstanceRef.current.off('move', window.positionFleetTrucks);
+            mapInstanceRef.current.off('zoom', window.positionFleetTrucks);
+            delete window.positionFleetTrucks;
+          }
+    
+          // Clean up map reference
+          if (isFleetView && window.currentFleetMap) {
+            delete window.currentFleetMap;
+          }
+    
           mapInstanceRef.current.remove();
         } catch (error) {
           console.warn('Error removing map:', error);
