@@ -36,3 +36,24 @@
     transform: rotate(360deg);
   }
 }
+
+/* Leaflet map dark theme integration */
+.leaflet-container {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+.leaflet-popup-content {
+  margin: 8px 12px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-content strong {
+  font-family: 'Orbitron', sans-serif !important;
+}
+
+/* Hide attribution on small maps */
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(13, 2, 8, 0.8) !important;
+  color: #666 !important;
+}

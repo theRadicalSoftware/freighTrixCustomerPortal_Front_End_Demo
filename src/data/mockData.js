@@ -25,7 +25,12 @@ export const mockShipments = [
       customerRef: 'PO-2024-8829',
       carrier: 'FreighTrix Premium',
       trailerType: '53ft Refrigerated',
-      seal: 'TMP-847592'
+      seal: 'TMP-847592',
+      coordinates: {
+        origin: [41.8781, -87.6298],
+        destination: [39.7392, -104.9903],
+        current: [41.5868, -93.6250]
+      }
     },
     {
       id: 'FT-2024-1248',
@@ -52,7 +57,12 @@ export const mockShipments = [
       customerRef: 'PO-2024-8834',
       carrier: 'FreighTrix Medical',
       trailerType: '53ft Refrigerated',
-      seal: 'TMP-847593'
+      seal: 'TMP-847593',
+      coordinates: {
+        origin: [29.7604, -95.3698],
+        destination: [25.7617, -80.1918],
+        current: [29.7604, -95.3698]
+      }
     },
     {
       id: 'FT-2024-1249',
@@ -79,7 +89,12 @@ export const mockShipments = [
       customerRef: 'PO-2024-8801',
       carrier: 'FreighTrix Standard',
       trailerType: '53ft Dry Van',
-      seal: 'TMP-847594'
+      seal: 'TMP-847594',
+      coordinates: {
+        origin: [34.0522, -118.2437],
+        destination: [47.6062, -122.3321],
+        current: [38.5816, -121.4944]
+      }
     },
     {
       id: 'FT-2024-1250',
@@ -106,7 +121,12 @@ export const mockShipments = [
       customerRef: 'PO-2024-8765',
       carrier: 'FreighTrix Standard',
       trailerType: '53ft Dry Van',
-      seal: 'TMP-847595'
+      seal: 'TMP-847595',
+      coordinates: {
+        origin: [33.7490, -84.3880],
+        destination: [35.2271, -80.8431],
+        current: [35.2271, -80.8431]
+      }
     }
   ];
   

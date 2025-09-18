@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import LiveMap from './LiveMap';
 import semiIcon from '../imgs/freighTrixMapSemiIcon.png';
 import truckIcon from '../imgs/freighTrixTruckIcon.png';
 
@@ -130,106 +131,123 @@ const ShipmentDetailsModal = ({ shipment, onClose, onViewDocument }) => {
         </div>
         
         <div style={styles.mapContainer}>
-          <svg width="100%" height="250" viewBox="0 0 500 250" style={styles.mapSvg}>
-            {/* Geofenced route corridor */}
-            <path 
-              d="M 25 125 Q 125 75 250 125 T 475 125" 
-              stroke="rgba(0, 255, 65, 0.2)" 
-              strokeWidth="20" 
-              fill="none"
-            />
-            {/* Main route line */}
-            <path 
-              d="M 25 125 Q 125 75 250 125 T 475 125" 
-              stroke="#00ff41" 
-              strokeWidth="4" 
-              fill="none"
-            />
-            
-            {/* Origin */}
-            <circle cx="25" cy="125" r="8" fill="#00ffff"/>
-            <text x="25" y="145" textAnchor="middle" fill="#00ffff" fontSize="10" fontWeight="600">
-              {shipment.origin.split(',')[0]}
-            </text>
-            
-            {/* Destination */}
-            <circle cx="475" cy="125" r="8" fill="#ff00ff"/>
-            <text x="475" y="145" textAnchor="middle" fill="#ff00ff" fontSize="10" fontWeight="600">
-              {shipment.destination.split(',')[0]}
-            </text>
-            
-            {/* Current position with real truck icon */}
-            <g transform={`translate(${25 + (shipment.progress * 4.5)}, 125)`}>
-              <circle cx="0" cy="0" r="12" fill="rgba(0, 255, 65, 0.3)">
-                <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/>
-              </circle>
-              <image 
-                href={shipment.cargo === 'Pharmaceuticals' ? semiIcon : truckIcon}
-                x="-14" y="-14" width="28" height="28"
-              />
-              <text x="0" y="26" textAnchor="middle" fill="#00ff41" fontSize="9" fontWeight="700">
-                {shipment.truck}
-              </text>
-              <text x="0" y="38" textAnchor="middle" fill="#e0e0e0" fontSize="8">
-                {shipment.currentLocation.split(',')[0]}
-              </text>
-            </g>
-            
-            {/* Enhanced waypoints */}
-            <circle cx="150" cy="100" r="4" fill="#00ffff" opacity="0.8"/>
-            <text x="150" y="90" textAnchor="middle" fill="#00ffff" fontSize="8" fontWeight="500">Checkpoint 1</text>
-            <text x="150" y="115" textAnchor="middle" fill="#999" fontSize="7">Rest/Fuel</text>
-            
-            <circle cx="300" cy="150" r="4" fill="#00ffff" opacity="0.8"/>
-            <text x="300" y="165" textAnchor="middle" fill="#00ffff" fontSize="8" fontWeight="500">Checkpoint 2</text>
-            <text x="300" y="180" textAnchor="middle" fill="#999" fontSize="7">Inspection</text>
-            
-            <circle cx="400" cy="110" r="4" fill="#00ffff" opacity="0.8"/>
-            <text x="400" y="100" textAnchor="middle" fill="#00ffff" fontSize="8" fontWeight="500">Checkpoint 3</text>
-            <text x="400" y="125" textAnchor="middle" fill="#999" fontSize="7">Final Mile</text>
-          </svg>
+          <LiveMap
+            key={`modal-map-${shipment.id}`}
+            shipment={shipment}
+            height={300}
+            showRoute={true}
+          />
         </div>
         
-        <div style={styles.trackingMetrics}>
-          <div style={styles.trackingMetric}>
-            <span style={styles.metricLabel}>Speed:</span>
-            <span style={styles.metricValue}>67 mph</span>
+        <div style={styles.enhancedTrackingMetrics}>
+          <div style={styles.enhancedTrackingMetric}>
+            <div style={styles.metricIcon}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#00ff41" strokeWidth="2"/>
+              </svg>
+            </div>
+            <div style={styles.metricInfo}>
+              <span style={styles.metricLabel}>Speed:</span>
+              <span style={styles.metricValue}>67 mph</span>
+            </div>
           </div>
-          <div style={styles.trackingMetric}>
-            <span style={styles.metricLabel}>Distance Remaining:</span>
-            <span style={styles.metricValue}>{Math.round((100 - shipment.progress) * 10)} miles</span>
+          
+          <div style={styles.enhancedTrackingMetric}>
+            <div style={styles.metricIcon}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h4m6-6h4a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4m-6 0V9a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z" stroke="#00ffff" strokeWidth="2"/>
+              </svg>
+            </div>
+            <div style={styles.metricInfo}>
+              <span style={styles.metricLabel}>Distance Remaining:</span>
+              <span style={styles.metricValue}>{Math.round((100 - shipment.progress) * 10)} miles</span>
+            </div>
           </div>
-          <div style={styles.trackingMetric}>
-            <span style={styles.metricLabel}>Next Checkpoint:</span>
-            <span style={styles.metricValue}>47 miles</span>
+          
+          <div style={styles.enhancedTrackingMetric}>
+            <div style={styles.metricIcon}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="#ff00ff" strokeWidth="2"/>
+                <path d="M12 6v6l4 2" stroke="#ff00ff" strokeWidth="2"/>
+              </svg>
+            </div>
+            <div style={styles.metricInfo}>
+              <span style={styles.metricLabel}>Next Checkpoint:</span>
+              <span style={styles.metricValue}>47 miles</span>
+            </div>
+          </div>
+          
+          <div style={styles.enhancedTrackingMetric}>
+            <div style={styles.metricIcon}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#00ff41" strokeWidth="2"/>
+              </svg>
+            </div>
+            <div style={styles.metricInfo}>
+              <span style={styles.metricLabel}>Temperature:</span>
+              <span style={styles.metricValue}>{shipment.temperature}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={styles.geofenceSection}>
-        <h4 style={styles.geofenceTitle}>Geofence & Security</h4>
-        <div style={styles.geofenceInfo}>
-          <div style={styles.geofenceItem}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#00ff41" strokeWidth="2"/>
-              <path d="M2 17l10 5 10-5" stroke="#00ff41" strokeWidth="2"/>
-              <path d="M2 12l10 5 10-5" stroke="#00ff41" strokeWidth="2"/>
-            </svg>
+      <div style={styles.enhancedGeofenceSection}>
+        <h4 style={styles.geofenceTitle}>Advanced Tracking & Security</h4>
+        <div style={styles.enhancedGeofenceGrid}>
+          <div style={styles.enhancedGeofenceItem}>
+            <div style={styles.geofenceIcon}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#00ff41" strokeWidth="2"/>
+                <path d="M2 17l10 5 10-5" stroke="#00ff41" strokeWidth="2"/>
+                <path d="M2 12l10 5 10-5" stroke="#00ff41" strokeWidth="2"/>
+              </svg>
+            </div>
             <div style={styles.geofenceDetails}>
               <div style={styles.geofenceLabel}>Route Compliance</div>
-              <div style={styles.geofenceStatus}>Within approved corridor</div>
+              <div style={styles.geofenceStatus}>✓ Within approved corridor</div>
+              <div style={styles.geofenceSubtext}>Last verified: 2 min ago</div>
             </div>
           </div>
           
-          <div style={styles.geofenceItem}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="#00ff41" strokeWidth="2"/>
-              <circle cx="12" cy="16" r="1" fill="#00ff41"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#00ff41" strokeWidth="2"/>
-            </svg>
+          <div style={styles.enhancedGeofenceItem}>
+            <div style={styles.geofenceIcon}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="#00ff41" strokeWidth="2"/>
+                <circle cx="12" cy="16" r="1" fill="#00ff41"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#00ff41" strokeWidth="2"/>
+              </svg>
+            </div>
             <div style={styles.geofenceDetails}>
               <div style={styles.geofenceLabel}>Security Status</div>
-              <div style={styles.geofenceStatus}>All systems secure</div>
+              <div style={styles.geofenceStatus}>🔒 All systems secure</div>
+              <div style={styles.geofenceSubtext}>Seal intact • GPS active</div>
+            </div>
+          </div>
+
+          <div style={styles.enhancedGeofenceItem}>
+            <div style={styles.geofenceIcon}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="#00ffff" strokeWidth="2"/>
+                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="#00ffff" strokeWidth="2"/>
+              </svg>
+            </div>
+            <div style={styles.geofenceDetails}>
+              <div style={styles.geofenceLabel}>Communication</div>
+              <div style={styles.geofenceStatus}>📡 Signal Strong</div>
+              <div style={styles.geofenceSubtext}>4G LTE • 98% uptime</div>
+            </div>
+          </div>
+
+          <div style={styles.enhancedGeofenceItem}>
+            <div style={styles.geofenceIcon}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#ff00ff" strokeWidth="2"/>
+              </svg>
+            </div>
+            <div style={styles.geofenceDetails}>
+              <div style={styles.geofenceLabel}>Environmental</div>
+              <div style={styles.geofenceStatus}>🌡️ Temp: {shipment.temperature}</div>
+              <div style={styles.geofenceSubtext}>Range maintained • 98.7% compliance</div>
             </div>
           </div>
         </div>
@@ -680,6 +698,75 @@ const styles = {
     fontSize: '1rem',
     fontWeight: 600,
     color: '#00ff41',
+  },
+  enhancedTrackingMetrics: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '1rem',
+    marginTop: '1rem',
+  },
+  enhancedTrackingMetric: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '1rem',
+    backgroundColor: 'rgba(0, 255, 65, 0.05)',
+    border: '1px solid rgba(0, 255, 65, 0.2)',
+    borderRadius: '8px',
+    backdropFilter: 'blur(10px)',
+  },
+  metricIcon: {
+    width: '40px',
+    height: '40px',
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  metricInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem',
+    flex: 1,
+  },
+  enhancedGeofenceSection: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    border: '1px solid rgba(0, 255, 65, 0.1)',
+    borderRadius: '12px',
+    padding: '1.5rem',
+    marginTop: '1.5rem',
+  },
+  enhancedGeofenceGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gap: '1rem',
+  },
+  enhancedGeofenceItem: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '1rem',
+    padding: '1rem',
+    backgroundColor: 'rgba(0, 255, 65, 0.03)',
+    border: '1px solid rgba(0, 255, 65, 0.1)',
+    borderRadius: '8px',
+    transition: 'all 0.3s ease',
+  },
+  geofenceIcon: {
+    width: '48px',
+    height: '48px',
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  geofenceSubtext: {
+    fontSize: '0.7rem',
+    color: '#666',
+    marginTop: '0.25rem',
   },
   geofenceSection: {
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
