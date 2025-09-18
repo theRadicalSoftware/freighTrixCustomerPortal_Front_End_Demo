@@ -8,11 +8,11 @@ export const mockShipments = [
       driver: 'Marcus Rodriguez',
       driverPhone: '(312) 555-0147',
       truck: 'FT-TR-456',
-      currentLocation: 'Des Moines, IA',
+      currentLocation: 'Des Moines, IA', // Realistic point on I-80
       temperature: '4.2°C',
       eta: 'Dec 15, 2024 2:30 PM',
       onTime: true,
-      progress: 45,
+      progress: 33, // Updated progress to realistically reflect location
       lat: 41.5868,
       lng: -93.6250,
       cargo: 'Pharmaceuticals',
@@ -72,13 +72,13 @@ export const mockShipments = [
       driver: 'Mike Chen',
       driverPhone: '(323) 555-0123',
       truck: 'FT-TR-123',
-      currentLocation: 'Sacramento, CA',
+      currentLocation: 'Grants Pass, OR', // Updated location to better match progress
       temperature: 'Ambient',
       eta: 'Dec 15, 2024 6:00 PM',
       onTime: false,
-      progress: 70,
-      lat: 38.5816,
-      lng: -121.4944,
+      progress: 58, // Updated progress to realistically reflect location
+      lat: 42.4390, // Updated coordinates for Grants Pass, OR
+      lng: -123.3298, // Updated coordinates for Grants Pass, OR
       cargo: 'Electronics',
       value: '$875K',
       weight: '45,000 lbs',
@@ -93,7 +93,7 @@ export const mockShipments = [
       coordinates: {
         origin: [34.0522, -118.2437],
         destination: [47.6062, -122.3321],
-        current: [38.5816, -121.4944]
+        current: [42.4390, -123.3298] // Updated coordinates for Grants Pass, OR
       }
     },
     {
@@ -129,7 +129,7 @@ export const mockShipments = [
       }
     }
   ];
-  
+
   export const mockFleetData = {
     totalTrucks: 15,
     activeTrucks: 13,
@@ -142,7 +142,7 @@ export const mockShipments = [
     fuelEfficiency: 6.8,
     safetyRating: 4.7
   };
-  
+
   export const mockTemperatureData = [
     { time: '08:00', temp: 4.1, target: 4.0 },
     { time: '09:00', temp: 4.3, target: 4.0 },
@@ -153,7 +153,7 @@ export const mockShipments = [
     { time: '14:00', temp: 4.1, target: 4.0 },
     { time: '15:00', temp: 4.2, target: 4.0 },
   ];
-  
+
   export const mockDocuments = {
     'FT-2024-1247': {
       bol: {
@@ -164,27 +164,27 @@ export const mockShipments = [
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       },
       photos: [
-        { 
-           type: 'loading', 
-           timestamp: '2024-12-13T08:20:00Z', 
+        {
+           type: 'loading',
+           timestamp: '2024-12-13T08:20:00Z',
            url: '/imgs/trackersImg.jpeg',
            description: 'Temperature sensor verification before loading'
         },
-        { 
-           type: 'loading', 
-           timestamp: '2024-12-13T08:22:00Z', 
+        {
+           type: 'loading',
+           timestamp: '2024-12-13T08:22:00Z',
            url: '/docs/LinkedInPhotosOfShipment.docx',
            description: 'Complete shipment photo documentation'
         },
-        { 
-           type: 'seal', 
-           timestamp: '2024-12-13T08:25:00Z', 
+        {
+           type: 'seal',
+           timestamp: '2024-12-13T08:25:00Z',
            url: '/imgs/trackersImg.jpeg',
            description: 'RAP door seals intact verification'
         },
-        { 
-           type: 'temperature', 
-           timestamp: '2024-12-13T08:26:00Z', 
+        {
+           type: 'temperature',
+           timestamp: '2024-12-13T08:26:00Z',
            url: '/imgs/trackersImg.jpeg',
            description: 'Trailer temperature verification'
         }
@@ -192,7 +192,7 @@ export const mockShipments = [
       temperature: mockTemperatureData
     }
   };
-  
+
   export const mockCustomers = [
     {
       id: 'CUST-001',
@@ -207,17 +207,17 @@ export const mockShipments = [
       onTimeRate: 94.2
     }
   ];
-  
+
   export const getShipmentById = (id) => {
     return mockShipments.find(shipment => shipment.id === id);
   };
-  
+
   export const getActiveShipments = () => {
-    return mockShipments.filter(shipment => 
+    return mockShipments.filter(shipment =>
       shipment.status === 'In Transit' || shipment.status === 'Loading'
     );
   };
-  
+
   export const getShipmentDocuments = (id) => {
     return mockDocuments[id] || null;
   };

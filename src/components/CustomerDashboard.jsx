@@ -11,69 +11,74 @@ const CustomerDashboard = ({ userData, onLogout }) => {
   const [selectedShipment, setSelectedShipment] = useState(null);
   const [showPulse, setShowPulse] = useState(true);
   const [liveData, setLiveData] = useState({
-    totalShipments: 12,
-    inTransit: 8,
-    delivered: 4,
+    totalShipments: 3,
+    inTransit: 3,
+    delivered: 0,
     fleetUtilization: 87
   });
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(null);
   const [documentType, setDocumentType] = useState('');
 
+  // Add this state for tooltip management
+  const [activeTooltip, setActiveTooltip] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+
   // Mock shipment data
+  // Replace the mockShipments array with this reduced version
   const mockShipments = [
-    {
-      id: 'FT-2024-1247',
-      status: 'In Transit',
-      origin: 'Chicago, IL',
-      destination: 'Denver, CO',
-      driver: 'Marcus Rodriguez',
-      truck: 'FT-TR-456',
-      currentLocation: 'Des Moines, IA',
-      temperature: '4.2°C',
-      eta: 'Dec 15, 2:30 PM',
-      onTime: true,
-      progress: 45,
-      lat: 41.5868,
-      lng: -93.6250,
-      cargo: 'Pharmaceuticals',
-      value: '$2.3M'
-    },
-    {
-      id: 'FT-2024-1248',
-      status: 'Loading',
-      origin: 'Houston, TX',
-      destination: 'Miami, FL',
-      driver: 'Sarah Johnson',
-      truck: 'FT-TR-892',
-      currentLocation: 'Houston, TX',
-      temperature: '2.1°C',
-      eta: 'Dec 16, 10:00 AM',
-      onTime: true,
-      progress: 5,
-      lat: 29.7604,
-      lng: -95.3698,
-      cargo: 'Medical Supplies',
-      value: '$1.8M'
-    },
-    {
-      id: 'FT-2024-1249',
-      status: 'In Transit',
-      origin: 'Los Angeles, CA',
-      destination: 'Seattle, WA',
-      driver: 'Mike Chen',
-      truck: 'FT-TR-123',
-      currentLocation: 'Sacramento, CA',
-      temperature: 'Ambient',
-      eta: 'Dec 15, 6:00 PM',
-      onTime: false,
-      progress: 70,
-      lat: 38.5816,
-      lng: -121.4944,
-      cargo: 'Electronics',
-      value: '$875K'
-    }
-  ];
+      {
+        id: 'FT-2024-1247',
+        status: 'In Transit',
+        origin: 'Chicago, IL',
+        destination: 'Denver, CO',
+        driver: 'Marcus Rodriguez',
+        truck: 'FT-TR-456',
+        currentLocation: 'Des Moines, IA',
+        temperature: '4.2°C',
+        eta: 'Dec 15, 2:30 PM',
+        onTime: true,
+        progress: 45,
+        lat: 41.5868,
+        lng: -93.6250,
+        cargo: 'Pharmaceuticals',
+        value: '$2.3M'
+      },
+      {
+        id: 'FT-2024-1248',
+        status: 'In Transit',
+        origin: 'Houston, TX',
+        destination: 'Miami, FL',
+        driver: 'Sarah Johnson',
+        truck: 'FT-TR-892',
+        currentLocation: 'Tallahassee, FL',
+        temperature: '2.1°C',
+        eta: 'Dec 16, 10:00 AM',
+        onTime: true,
+        progress: 75,
+        lat: 30.4383,
+        lng: -84.2807,
+        cargo: 'Medical Supplies',
+        value: '$1.8M'
+      },
+      {
+        id: 'FT-2024-1249',
+        status: 'In Transit',
+        origin: 'Los Angeles, CA',
+        destination: 'Seattle, WA',
+        driver: 'Mike Chen',
+        truck: 'FT-TR-123',
+        currentLocation: 'Grants Pass, OR',
+        temperature: 'Ambient',
+        eta: 'Dec 15, 6:00 PM',
+        onTime: false,
+        progress: 70,
+        lat: 42.4390,
+        lng: -123.3298,
+        cargo: 'Electronics',
+        value: '$875K'
+      }
+    ];
 
   useEffect(() => {
     const pulseInterval = setInterval(() => {
@@ -93,6 +98,41 @@ const CustomerDashboard = ({ userData, onLogout }) => {
       clearInterval(dataInterval);
     };
   }, []);
+
+  // Add this useEffect after your existing useEffects
+  useEffect(() => {
+    // Position trucks when map is ready
+    const positionTrucks = () => {
+      if (window.positionFleetTrucks) {
+        window.positionFleetTrucks();
+      }
+    };
+
+    // Try positioning trucks every second until successful
+    const positionInterval = setInterval(() => {
+      if (window.positionFleetTrucks) {
+        window.positionFleetTrucks();
+        clearInterval(positionInterval);
+      }
+    }, 1000);
+
+    return () => clearInterval(positionInterval);
+  }, [mockShipments]);
+
+  // Add this useEffect to handle closing tooltips on map interaction
+  useEffect(() => {
+    const handleMapInteraction = () => {
+      if (activeTooltip) {
+        setActiveTooltip(null);
+      }
+    };
+    // Listen for map interactions
+    const mapContainer = document.querySelector('[style*="position: relative"]');
+    if (mapContainer) {
+      mapContainer.addEventListener('click', handleMapInteraction);
+      return () => mapContainer.removeEventListener('click', handleMapInteraction);
+    }
+  }, [activeTooltip]);
 
   const handleShipmentSelect = (shipment) => {
     setSelectedShipment(shipment);
@@ -160,6 +200,79 @@ const CustomerDashboard = ({ userData, onLogout }) => {
     setDocumentType('');
   };
 
+  // Add this function after handleCloseDocumentViewer
+  const handleTruckClick = (shipment, event) => {
+    event.stopPropagation(); // Prevent any parent click handlers
+  
+    if (activeTooltip === shipment.id) {
+      // If clicking the same truck, close tooltip
+      setActiveTooltip(null);
+    } else {
+      // Get click position relative to the map container
+      const mapContainer = event.currentTarget.closest('[style*="position: relative"]');
+      const rect = mapContainer.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+          
+      setTooltipPosition({ x, y });
+      setActiveTooltip(shipment.id);
+    }
+  };
+
+  // Add function to close tooltip when clicking elsewhere
+  const handleMapClick = () => {
+    setActiveTooltip(null);
+  };
+
+  // Add these helper functions before renderFleetOverview()
+  const getRealisticMapPosition = (location) => {
+    // Map real locations to approximate pixel positions on a 1200x400 US map
+    const locationMap = {
+      'Des Moines, IA': { x: 520, y: 180 },      // Chicago to Denver route
+      'Tallahassee, FL': { x: 700, y: 350 },     // Houston to Miami route
+      'Grants Pass, OR': { x: 100, y: 140 },     // Los Angeles to Seattle route
+      'Chicago, IL': { x: 560, y: 160 },
+      'Denver, CO': { x: 360, y: 220 },
+      'Houston, TX': { x: 420, y: 320 },
+      'Miami, FL': { x: 780, y: 380 },
+      'Los Angeles, CA': { x: 60, y: 280 },
+      'Seattle, WA': { x: 120, y: 80 }
+    };
+    return locationMap[location] || { x: 500, y: 200 }; // Default to center US
+  };
+  
+  const getRealisticFleetPositions = () => {  // Return empty array - we only want to show the actual shipment trucks  
+    return [];
+  };
+
+  // Add this function after getRealisticFleetPositions
+  const positionTrucksOnMap = (mapInstance) => {
+    // Wait a bit for map to fully render
+    setTimeout(() => {
+      const trucks = document.querySelectorAll('[data-shipment-id]');
+      trucks.forEach(truck => {
+        const lat = parseFloat(truck.getAttribute('data-lat'));
+        const lng = parseFloat(truck.getAttribute('data-lng'));
+              
+        if (lat && lng && mapInstance) {
+          try {
+            // Convert lat/lng to pixel coordinates using Trimble Maps
+            const point = mapInstance.project([lng, lat]);
+                      
+            // Position the truck overlay at the correct pixel location
+            truck.style.left = `${point.x}px`;
+            truck.style.top = `${point.y}px`;
+            truck.style.position = 'absolute';
+            truck.style.transform = 'translate(-50%, -50%)';
+            truck.style.pointerEvents = 'auto';
+          } catch (error) {
+            console.warn('Error positioning truck:', error);
+          }
+        }
+      });
+    }, 500);
+  };
+
   const renderFleetOverview = () => (
     <div style={styles.viewContainer}>
       {/* Fleet Statistics */}
@@ -218,172 +331,249 @@ const CustomerDashboard = ({ userData, onLogout }) => {
       </div>
 
       {/* Interactive Fleet Map */}
-<div style={styles.mapCard}>
-  <div style={styles.mapHeader}>
-    <h3 style={styles.mapTitle}>Live Fleet Tracking</h3>
-    <div style={styles.mapControls}>
-      <button style={styles.mapControl}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <polyline points="23 4 23 10 17 10" stroke="currentColor" strokeWidth="2"/>
-          <polyline points="1 20 1 14 7 14" stroke="currentColor" strokeWidth="2"/>
-          <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2"/>
-        </svg>
-        Refresh
-      </button>
-      <button style={styles.mapControl}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
-          <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2"/>
-          <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2"/>
-        </svg>
-        Full Screen
-      </button>
-    </div>
-  </div>
-  <div style={styles.mapContainer}>
-    {/* Trimble Map with Fleet Overlay */}
-    <div style={{ position: 'relative' }}>
-      <LiveMap
-        key="fleet-overview-map"
-        shipment={mockShipments[0]} // Primary shipment for route
-        height={400}
-        showRoute={false} // Don't show individual route
-        isFleetView={true}
-      />
-      {/* Fleet Overlay Container */}
-      <div style={styles.fleetOverlay}>
-        {/* Main active shipments with truck icons */}
-        {mockShipments.map((shipment, index) => {
-          const x = 100 + (index * 200) + (shipment.progress * 2);
-          const y = 180 + (Math.sin(index) * 40);
-          const isSemi = shipment.cargo === 'Pharmaceuticals' || shipment.cargo === 'Medical Supplies';
-          return (
-            <div
-               key={shipment.id}
-               style={{
-                ...styles.truckMarker,
-                left: `${x}px`,
-                top: `${y}px`
+      <div style={styles.mapCard}>
+        <div style={styles.mapHeader}>
+          <h3 style={styles.mapTitle}>Live Fleet Tracking</h3>
+          <div style={styles.mapControls}>
+            <button
+              style={styles.mapControl}
+              onClick={() => {
+                if (window.currentFleetMap) {
+                  window.currentFleetMap.zoomIn();
+                }
               }}
             >
-              {/* Truck icon */}
-              <img
-                 src={isSemi ? semiIcon : truckIcon}
-                alt={shipment.truck}
-                style={{
-                  ...styles.truckIcon,
-                  filter: shipment.onTime ? 'none' : 'hue-rotate(180deg)',
-                  cursor: 'pointer'
-                }}
-                onClick={() => handleShipmentSelect(shipment)}
-              />
-              {/* Pulse animation for active shipment */}
-              {index === 0 && (
-                <div style={styles.pulseRing} className="pulse-animation" />
-              )}
-              {/* Enhanced info bubble for featured shipment */}
-              {index === 0 && (
-                <div style={styles.shipmentInfoBubble}>
-                  <div style={styles.infoBubbleContent}>
-                    <div style={styles.bubbleTitle}>{shipment.id}</div>
-                    <div style={styles.bubbleLocation}>📍 {shipment.currentLocation}</div>
-                    <div style={styles.bubbleStatus}>
-                      ⏰ {shipment.onTime ? 'On Time' : 'Delayed'} • ETA: {shipment.eta.split(' ')[2]}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" strokeWidth="2"/>
+                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              Zoom In
+            </button>
+            <button
+              style={styles.mapControl}
+              onClick={() => {
+                if (window.currentFleetMap) {
+                  window.currentFleetMap.zoomOut();
+                }
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              Zoom Out
+            </button>
+            <button style={styles.mapControl}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <polyline points="23 4 23 10 17 10" stroke="currentColor" strokeWidth="2"/>
+                <polyline points="1 20 1 14 7 14" stroke="currentColor" strokeWidth="2"/>
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              Refresh
+            </button>
+            <button style={styles.mapControl}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
+                <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2"/>
+                <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              Full Screen
+            </button>
+          </div>
+        </div>
+        <div style={styles.mapContainer}>
+          {/* Trimble Map with Fleet Overlay */}
+          <div style={{ position: 'relative' }}>
+            <LiveMap
+              key="fleet-overview-map"
+              shipment={mockShipments[0]} // Primary shipment for route
+              height={400}
+              showRoute={false} // Don't show individual route
+              isFleetView={true}
+              onMapLoad={positionTrucksOnMap}
+            />
+            {/* Fleet Overlay Container */}
+            <div style={styles.fleetOverlayInteractive}>
+              {/* Main active shipments with truck icons - ONLY these three */}
+              {mockShipments.map((shipment, index) => {
+                // Skip if this is not an in-transit shipment (for cleaner display)
+                if (shipment.status !== 'In Transit') return null;
+                
+                return (
+                  <div
+                    key={shipment.id}
+                    style={{
+                      ...styles.truckMarkerGeo,
+                      // We'll position these via JavaScript after map loads
+                    }}
+                    data-lat={shipment.lat}
+                    data-lng={shipment.lng}
+                    data-shipment-id={shipment.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Close tooltip if clicking elsewhere
+                      if (activeTooltip && !e.target.closest('[data-shipment-id]')) {
+                        setActiveTooltip(null);
+                      }
+                    }}
+                  >
+                    {/* Truck icon */}
+                    <img
+                      src={shipment.cargo === 'Pharmaceuticals' || shipment.cargo === 'Medical Supplies' ? semiIcon : truckIcon}
+                      alt={shipment.truck}
+                      style={{
+                        ...styles.truckIcon,
+                        filter: shipment.onTime ? 'none' : 'hue-rotate(180deg)',
+                        cursor: 'pointer',
+                        // Add visual feedback when tooltip is active
+                        transform: activeTooltip === shipment.id ? 'scale(1.1)' : 'scale(1)',
+                        boxShadow: activeTooltip === shipment.id ? '0 0 15px rgba(0, 255, 65, 0.6)' : 'none',
+                        borderRadius: '50%'
+                      }}
+                      onClick={(e) => handleTruckClick(shipment, e)}
+                    />
+                    {/* Rest of truck marker content remains the same */}
+                    {index === 0 && (
+                      <div style={styles.steadyGlow} />
+                    )}
+                    <div style={{
+                      ...styles.truckLabel,
+                      color: shipment.onTime ? '#00ff41' : '#ff0040'
+                    }}>
+                      {shipment.truck}
                     </div>
-                    <div style={styles.bubbleTemp}>🌡️ Temp: {shipment.temperature}</div>
-                    <button
-                      style={styles.bubbleButton}
-                      onClick={() => handleShipmentSelect(shipment)}>
-                      Go to Dashboard
-                    </button>
                   </div>
+                );
+              })}
+              {/* Dynamic Tooltip */}
+              {activeTooltip && (
+                <div 
+                   style={{
+                    ...styles.dynamicTooltip,
+                    left: `${tooltipPosition.x}px`,
+                    top: `${tooltipPosition.y}px`,
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {(() => {
+                    const shipment = mockShipments.find(s => s.id === activeTooltip);
+                    if (!shipment) return null;
+                            
+                    return (
+                      <div style={styles.tooltipContent}>
+                        <div style={styles.tooltipHeader}>
+                          <div style={styles.tooltipTitle}>{shipment.id}</div>
+                          <button 
+                            style={styles.tooltipClose}
+                            onClick={() => setActiveTooltip(null)}
+                          >
+                            ×
+                          </button>
+                        </div>
+                                    
+                        <div style={styles.tooltipBody}>
+                          <div style={styles.tooltipRow}>
+                            <span style={styles.tooltipIcon}>📍</span>
+                            <span style={styles.tooltipText}>{shipment.currentLocation}</span>
+                          </div>
+                                        
+                          <div style={styles.tooltipRow}>
+                            <span style={styles.tooltipIcon}>👤</span>
+                            <span style={styles.tooltipText}>{shipment.driver}</span>
+                          </div>
+                                        
+                          <div style={styles.tooltipRow}>
+                            <span style={styles.tooltipIcon}>🚛</span>
+                            <span style={styles.tooltipText}>{shipment.truck}</span>
+                          </div>
+                                        
+                          <div style={styles.tooltipRow}>
+                            <span style={styles.tooltipIcon}>⏰</span>
+                            <span style={styles.tooltipText}>
+                              {shipment.onTime ? 'On Time' : 'Delayed'} • ETA: {shipment.eta.split(' ')[2]}
+                            </span>
+                          </div>
+                                        
+                          <div style={styles.tooltipRow}>
+                            <span style={styles.tooltipIcon}>🌡️</span>
+                            <span style={styles.tooltipText}>Temp: {shipment.temperature}</span>
+                          </div>
+                                        
+                          <div style={styles.tooltipRow}>
+                            <span style={styles.tooltipIcon}>📦</span>
+                            <span style={styles.tooltipText}>{shipment.cargo}</span>
+                          </div>
+                                        
+                          <div style={styles.tooltipProgress}>
+                            <span style={styles.tooltipProgressLabel}>Progress: {shipment.progress}%</span>
+                            <div style={styles.tooltipProgressBar}>
+                              <div 
+                                style={{
+                                  ...styles.tooltipProgressFill,
+                                  width: `${shipment.progress}%`,
+                                  backgroundColor: shipment.onTime ? '#00ff41' : '#ff0040'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                                    
+                        <div style={styles.tooltipFooter}>
+                          <button
+                            style={styles.tooltipViewButton}
+                            onClick={() => {
+                              setActiveTooltip(null);
+                              handleShipmentSelect(shipment);
+                            }}
+                          >
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
-              {/* Truck label */}
-              <div style={{
-                ...styles.truckLabel,
-                color: shipment.onTime ? '#00ff41' : '#ff0040'
-              }}>
-                {shipment.truck}
+                  
+              {/* Legend Overlay - same as before */}
+              <div style={styles.mapLegend}>
+                <div style={styles.legendTitle}>Fleet Status</div>
+                <div style={styles.legendItem}>
+                  <img src={semiIcon} style={styles.legendIcon} alt="Semi" />
+                  <span style={styles.legendText}>Semi Trucks (Active)</span>
+                </div>
+                <div style={styles.legendItem}>
+                  <img src={truckIcon} style={styles.legendIcon} alt="Box truck" />
+                  <span style={styles.legendText}>Box Trucks (Active)</span>
+                </div>
+                <div style={styles.legendItem}>
+                  <div style={styles.legendPulse} />
+                  <span style={styles.legendText}>Live Tracking</span>
+                </div>
               </div>
             </div>
-          );
-        })}
-        {/* Additional fleet trucks */}
-        {[...Array(12)].map((_, i) => {
-          const x = 80 + (i * 55) + (Math.random() * 40);
-          const y = 100 + (Math.random() * 200);
-          const status = Math.random() > 0.25;
-          const isSemi = Math.random() > 0.4;
-          return (
-            <div
-               key={`fleet-truck-${i}`}
-              style={{
-                ...styles.truckMarker,
-                left: `${x}px`,
-                top: `${y}px`
-              }}
-            >
-              <img
-                 src={isSemi ? semiIcon : truckIcon}
-                alt={`FT-${(i + 100).toString().padStart(3, '0')}`}
-                style={{
-                  ...styles.smallTruckIcon,
-                  opacity: status ? 1 : 0.4,
-                  filter: status ? 'none' : 'grayscale(1)'
-                }}
-              />
-              <div style={{
-                ...styles.truckLabel,
-                color: status ? '#00ff41' : '#666'
-              }}>
-                FT-{(i + 100).toString().padStart(3, '0')}
-              </div>
-            </div>
-          );
-        })}
-        {/* Legend Overlay */}
-        <div style={styles.mapLegend}>
-          <div style={styles.legendTitle}>Fleet Status</div>
-          <div style={styles.legendItem}>
-            <img src={semiIcon} style={styles.legendIcon} alt="Semi" />
-            <span style={styles.legendText}>Semi Trucks (Active)</span>
           </div>
-          <div style={styles.legendItem}>
-            <img src={truckIcon} style={styles.legendIcon} alt="Box truck" />
-            <span style={styles.legendText}>Box Trucks (Active)</span>
+        </div>
+        <div style={styles.mapStats}>
+          <div style={styles.mapStat}>
+            <span style={styles.mapStatLabel}>Active Trucks:</span>
+            <span style={styles.mapStatValue}>3/3</span>
           </div>
-          <div style={styles.legendItem}>
-            <img src={truckIcon} style={{...styles.legendIcon, opacity: 0.4, filter: 'grayscale(1)'}} alt="Inactive" />
-            <span style={styles.legendTextInactive}>Inactive/Maintenance</span>
+          <div style={styles.mapStat}>
+            <span style={styles.mapStatLabel}>On Time:</span>
+            <span style={styles.mapStatValue}>67%</span>
           </div>
-          <div style={styles.legendItem}>
-            <div style={styles.legendPulse} />
-            <span style={styles.legendText}>Live Tracking</span>
+          <div style={styles.mapStat}>
+            <span style={styles.mapStatLabel}>Routes Active:</span>
+            <span style={styles.mapStatValue}>3</span>
+          </div>
+          <div style={styles.mapStat}>
+            <span style={styles.mapStatLabel}>Fleet Utilization:</span>
+            <span style={styles.mapStatValue}>100%</span>
           </div>
         </div>
       </div>
-    </div>
-  </div>
-  <div style={styles.mapStats}>
-    <div style={styles.mapStat}>
-      <span style={styles.mapStatLabel}>Active Trucks:</span>
-      <span style={styles.mapStatValue}>15/18</span>
-    </div>
-    <div style={styles.mapStat}>
-      <span style={styles.mapStatLabel}>On Time:</span>
-      <span style={styles.mapStatValue}>89%</span>
-    </div>
-    <div style={styles.mapStat}>
-      <span style={styles.mapStatLabel}>Avg Speed:</span>
-      <span style={styles.mapStatValue}>62 mph</span>
-    </div>
-    <div style={styles.mapStat}>
-      <span style={styles.mapStatLabel}>Fleet Utilization:</span>
-      <span style={styles.mapStatValue}>87%</span>
-    </div>
-  </div>
-</div>
 
       {/* Active Shipments List */}
       <div style={styles.shipmentsCard}>
@@ -801,43 +991,29 @@ const CustomerDashboard = ({ userData, onLogout }) => {
 
       <style>
         {`
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
-    @keyframes matrixFall {
-      0% { transform: translateY(-100%); opacity: 0; }
-      50% { opacity: 1; }
-      100% { transform: translateY(100vh); opacity: 0; }
-    }
-    @keyframes slideIn {
-      from { transform: translateY(30px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.05); opacity: 0.8; }
-    }
-    @keyframes glow {
-      0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 65, 0.3); }
-      50% { box-shadow: 0 0 25px rgba(0, 255, 65, 0.6); }
-    }
-    /* Add pulse animation for fleet overlay */
-    .pulse-animation {
-      animation: pulse-ring 2s ease-in-out infinite;
-    }
-    @keyframes pulse-ring {
-      0% {
-        transform: translate(-50%, -50%) scale(0.8);
-        opacity: 0.8;
-      }
-      50% {
-        transform: translate(-50%, -50%) scale(1.2);
-        opacity: 0.4;
-      }
-      100% {
-        transform: translate(-50%, -50%) scale(0.8);
-        opacity: 0.8;
-      }
-    }
-  `}
+          @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+          @keyframes matrixFall {
+            0% { transform: translateY(-100%); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translateY(100vh); opacity: 0; }
+          }
+          @keyframes slideIn {
+            from { transform: translate(-50%, -120%) scale(0.8); opacity: 0; }
+            to { transform: translate(-50%, -120%) scale(1); opacity: 1; }
+          }
+          @keyframes glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 65, 0.3); }
+            50% { box-shadow: 0 0 25px rgba(0, 255, 65, 0.6); }
+          }
+          /* Steady glow instead of pulse */
+          .steady-glow {
+            animation: glow 4s ease-in-out infinite;
+          }
+          /* Tooltip hover effects */
+          button:hover {
+            opacity: 0.8;
+          }
+        `}
       </style>
     </div>
   );
@@ -1494,14 +1670,24 @@ const styles = {
     fontWeight: 500,
     transition: 'all 0.3s ease',
   },
-  // Add these new styles to the existing styles object
+  // Update the existing fleetOverlay style
   fleetOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     width: '100%',
     height: '100%',
-    pointerEvents: 'none',
+    pointerEvents: 'none', // Allow map interaction by default
+    zIndex: 10,
+  },
+  // Add new style for interactive overlay
+  fleetOverlayInteractive: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    pointerEvents: 'none', // Allow map interaction
     zIndex: 10,
   },
   truckMarker: {
@@ -1511,6 +1697,15 @@ const styles = {
     alignItems: 'center',
     pointerEvents: 'auto',
     transform: 'translate(-50%, -50%)',
+  },
+  // Update truck marker to be interactive
+  truckMarkerGeo: {
+    position: 'absolute',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    pointerEvents: 'auto', // Enable truck interaction
+    zIndex: 15,
   },
   truckIcon: {
     width: '40px',
@@ -1540,6 +1735,19 @@ const styles = {
     borderRadius: '50%',
     opacity: 0.6,
     pointerEvents: 'none',
+  },
+  steadyGlow: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '60px',
+    height: '60px',
+    border: '2px solid #00ff41',
+    borderRadius: '50%',
+    opacity: 0.6,
+    pointerEvents: 'none',
+    boxShadow: '0 0 15px rgba(0, 255, 65, 0.5)',
   },
   shipmentInfoBubble: {
     position: 'absolute',
@@ -1589,6 +1797,7 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.3s ease',
   },
+  // Update legend to be interactive
   mapLegend: {
     position: 'absolute',
     top: '20px',
@@ -1598,7 +1807,7 @@ const styles = {
     border: '1px solid #00ff41',
     borderRadius: '8px',
     padding: '10px',
-    pointerEvents: 'auto',
+    pointerEvents: 'auto', // Keep legend interactive
   },
   legendTitle: {
     color: '#00ff41',
@@ -1630,6 +1839,116 @@ const styles = {
     border: '2px solid #00ff41',
     borderRadius: '50%',
     position: 'relative',
+  },
+  // Update tooltip to be interactive
+  dynamicTooltip: {
+    position: 'absolute',
+    zIndex: 1000,
+    pointerEvents: 'auto', // Keep tooltip interactive
+    transform: 'translate(-50%, -120%)',
+    minWidth: '280px',
+    maxWidth: '320px',
+    animation: 'slideIn 0.3s ease-out',
+  },
+  tooltipContent: {
+    background: 'rgba(13, 2, 8, 0.95)',
+    border: '2px solid #00ff41',
+    borderRadius: '12px',
+    backdropFilter: 'blur(15px)',
+    boxShadow: '0 8px 32px rgba(0, 255, 65, 0.3)',
+    overflow: 'hidden',
+  },
+  tooltipHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 16px',
+    borderBottom: '1px solid rgba(0, 255, 65, 0.2)',
+    background: 'rgba(0, 255, 65, 0.1)',
+  },
+  tooltipTitle: {
+    color: '#00ff41',
+    fontSize: '14px',
+    fontWeight: 700,
+    fontFamily: 'Orbitron, sans-serif',
+  },
+  tooltipClose: {
+    background: 'none',
+    border: 'none',
+    color: '#00ff41',
+    fontSize: '18px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    padding: '0',
+    width: '20px',
+    height: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '50%',
+    transition: 'all 0.2s ease',
+  },
+  tooltipBody: {
+    padding: '16px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+  },
+  tooltipRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  tooltipIcon: {
+    fontSize: '14px',
+    width: '18px',
+    flexShrink: 0,
+  },
+  tooltipText: {
+    color: '#e0e0e0',
+    fontSize: '12px',
+    lineHeight: '1.4',
+  },
+  tooltipProgress: {
+    marginTop: '8px',
+  },
+  tooltipProgressLabel: {
+    color: '#00ffff',
+    fontSize: '11px',
+    fontWeight: 600,
+    marginBottom: '4px',
+    display: 'block',
+  },
+  tooltipProgressBar: {
+    width: '100%',
+    height: '6px',
+    backgroundColor: 'rgba(0, 255, 65, 0.2)',
+    borderRadius: '3px',
+    overflow: 'hidden',
+  },
+  tooltipProgressFill: {
+    height: '100%',
+    borderRadius: '3px',
+    transition: 'width 0.3s ease',
+  },
+  tooltipFooter: {
+    padding: '12px 16px',
+    borderTop: '1px solid rgba(0, 255, 65, 0.2)',
+    background: 'rgba(0, 255, 65, 0.05)',
+  },
+  tooltipViewButton: {
+    width: '100%',
+    padding: '8px 16px',
+    backgroundColor: '#00ff41',
+    color: '#0d0208',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
   },
 };
 
