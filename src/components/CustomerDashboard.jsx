@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import DocumentViewer from './DocumentViewer';
+import LiveMap from './LiveMap'; // This import is now used in the new map section
 import logoImage from '../imgs/FreightTrixHeader_Graphic.png';
 import truckIcon from '../imgs/freighTrixTruckIcon.png';
 import semiIcon from '../imgs/freighTrixMapSemiIcon.png';
@@ -217,184 +218,172 @@ const CustomerDashboard = ({ userData, onLogout }) => {
       </div>
 
       {/* Interactive Fleet Map */}
-      <div style={styles.mapCard}>
-        <div style={styles.mapHeader}>
-          <h3 style={styles.mapTitle}>Live Fleet Tracking</h3>
-          <div style={styles.mapControls}>
-            <button style={styles.mapControl}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <polyline points="23 4 23 10 17 10" stroke="currentColor" strokeWidth="2"/>
-                <polyline points="1 20 1 14 7 14" stroke="currentColor" strokeWidth="2"/>
-                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-              Refresh
-            </button>
-            <button style={styles.mapControl}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
-                <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2"/>
-                <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-              Full Screen
-            </button>
+<div style={styles.mapCard}>
+  <div style={styles.mapHeader}>
+    <h3 style={styles.mapTitle}>Live Fleet Tracking</h3>
+    <div style={styles.mapControls}>
+      <button style={styles.mapControl}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <polyline points="23 4 23 10 17 10" stroke="currentColor" strokeWidth="2"/>
+          <polyline points="1 20 1 14 7 14" stroke="currentColor" strokeWidth="2"/>
+          <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2"/>
+        </svg>
+        Refresh
+      </button>
+      <button style={styles.mapControl}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
+          <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2"/>
+          <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2"/>
+        </svg>
+        Full Screen
+      </button>
+    </div>
+  </div>
+  <div style={styles.mapContainer}>
+    {/* Trimble Map with Fleet Overlay */}
+    <div style={{ position: 'relative' }}>
+      <LiveMap
+        key="fleet-overview-map"
+        shipment={mockShipments[0]} // Primary shipment for route
+        height={400}
+        showRoute={false} // Don't show individual route
+        isFleetView={true}
+      />
+      {/* Fleet Overlay Container */}
+      <div style={styles.fleetOverlay}>
+        {/* Main active shipments with truck icons */}
+        {mockShipments.map((shipment, index) => {
+          const x = 100 + (index * 200) + (shipment.progress * 2);
+          const y = 180 + (Math.sin(index) * 40);
+          const isSemi = shipment.cargo === 'Pharmaceuticals' || shipment.cargo === 'Medical Supplies';
+          return (
+            <div
+               key={shipment.id}
+               style={{
+                ...styles.truckMarker,
+                left: `${x}px`,
+                top: `${y}px`
+              }}
+            >
+              {/* Truck icon */}
+              <img
+                 src={isSemi ? semiIcon : truckIcon}
+                alt={shipment.truck}
+                style={{
+                  ...styles.truckIcon,
+                  filter: shipment.onTime ? 'none' : 'hue-rotate(180deg)',
+                  cursor: 'pointer'
+                }}
+                onClick={() => handleShipmentSelect(shipment)}
+              />
+              {/* Pulse animation for active shipment */}
+              {index === 0 && (
+                <div style={styles.pulseRing} className="pulse-animation" />
+              )}
+              {/* Enhanced info bubble for featured shipment */}
+              {index === 0 && (
+                <div style={styles.shipmentInfoBubble}>
+                  <div style={styles.infoBubbleContent}>
+                    <div style={styles.bubbleTitle}>{shipment.id}</div>
+                    <div style={styles.bubbleLocation}>📍 {shipment.currentLocation}</div>
+                    <div style={styles.bubbleStatus}>
+                      ⏰ {shipment.onTime ? 'On Time' : 'Delayed'} • ETA: {shipment.eta.split(' ')[2]}
+                    </div>
+                    <div style={styles.bubbleTemp}>🌡️ Temp: {shipment.temperature}</div>
+                    <button
+                      style={styles.bubbleButton}
+                      onClick={() => handleShipmentSelect(shipment)}>
+                      Go to Dashboard
+                    </button>
+                  </div>
+                </div>
+              )}
+              {/* Truck label */}
+              <div style={{
+                ...styles.truckLabel,
+                color: shipment.onTime ? '#00ff41' : '#ff0040'
+              }}>
+                {shipment.truck}
+              </div>
+            </div>
+          );
+        })}
+        {/* Additional fleet trucks */}
+        {[...Array(12)].map((_, i) => {
+          const x = 80 + (i * 55) + (Math.random() * 40);
+          const y = 100 + (Math.random() * 200);
+          const status = Math.random() > 0.25;
+          const isSemi = Math.random() > 0.4;
+          return (
+            <div
+               key={`fleet-truck-${i}`}
+              style={{
+                ...styles.truckMarker,
+                left: `${x}px`,
+                top: `${y}px`
+              }}
+            >
+              <img
+                 src={isSemi ? semiIcon : truckIcon}
+                alt={`FT-${(i + 100).toString().padStart(3, '0')}`}
+                style={{
+                  ...styles.smallTruckIcon,
+                  opacity: status ? 1 : 0.4,
+                  filter: status ? 'none' : 'grayscale(1)'
+                }}
+              />
+              <div style={{
+                ...styles.truckLabel,
+                color: status ? '#00ff41' : '#666'
+              }}>
+                FT-{(i + 100).toString().padStart(3, '0')}
+              </div>
+            </div>
+          );
+        })}
+        {/* Legend Overlay */}
+        <div style={styles.mapLegend}>
+          <div style={styles.legendTitle}>Fleet Status</div>
+          <div style={styles.legendItem}>
+            <img src={semiIcon} style={styles.legendIcon} alt="Semi" />
+            <span style={styles.legendText}>Semi Trucks (Active)</span>
           </div>
-        </div>
-        <div style={styles.mapContainer}>
-          <svg width="100%" height="400" viewBox="0 0 800 400" style={styles.mapSvg}>
-            {/* Map background */}
-            <rect width="800" height="400" fill="rgba(0, 0, 0, 0.3)" rx="8"/>
-            
-            {/* Interstate routes */}
-            <path d="M 50 200 Q 200 150 400 200 T 750 200" stroke="rgba(0, 255, 65, 0.2)" strokeWidth="8" fill="none"/>
-            <path d="M 400 50 Q 400 150 400 200 Q 400 250 400 350" stroke="rgba(0, 255, 65, 0.2)" strokeWidth="6" fill="none"/>
-            
-            {/* Main active shipments with real truck icons */}
-            {mockShipments.map((shipment, index) => {
-              const x = 100 + (index * 200) + (shipment.progress * 2);
-              const y = 180 + (Math.sin(index) * 40);
-              const isSemi = shipment.cargo === 'Pharmaceuticals' || shipment.cargo === 'Medical Supplies';
-              
-              return (
-                <g key={shipment.id} transform={`translate(${x}, ${y})`}>
-                  {/* Truck icon using actual images */}
-                  <image 
-                    href={isSemi ? semiIcon : truckIcon}
-                    x="-20" y="-20" width="40" height="40"
-                    style={{cursor: 'pointer', filter: shipment.onTime ? 'none' : 'hue-rotate(180deg)'}}
-                    onClick={() => handleShipmentSelect(shipment)}
-                  />
-                  
-                  {/* Pulse animation for active shipment */}
-                  {index === 0 && (
-                    <circle 
-                      cx="0" cy="0" r="25" 
-                      fill="none" 
-                      stroke="#00ff41" 
-                      strokeWidth="2" 
-                      opacity="0.6"
-                    >
-                      <animate attributeName="r" values="25;35;25" dur="2s" repeatCount="indefinite"/>
-                      <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
-                    </circle>
-                  )}
-                  
-                  {/* Enhanced info bubble for featured shipment */}
-                  {index === 0 && (
-                    <g transform="translate(30, -50)">
-                      <rect 
-                        x="0" y="0" width="200" height="90" 
-                        fill="rgba(0, 255, 65, 0.15)" 
-                        stroke="#00ff41" 
-                        strokeWidth="2" 
-                        rx="12"
-                      />
-                      <text x="10" y="18" fill="#00ff41" fontSize="11" fontWeight="700">
-                        {shipment.id}
-                      </text>
-                      <text x="10" y="32" fill="#e0e0e0" fontSize="9">
-                        📍 {shipment.currentLocation}
-                      </text>
-                      <text x="10" y="45" fill="#00ffff" fontSize="9">
-                        ⏰ {shipment.onTime ? 'On Time' : 'Delayed'} • ETA: {shipment.eta.split(' ')[2]}
-                      </text>
-                      <text x="10" y="58" fill="#ff00ff" fontSize="9">
-                        🌡️ Temp: {shipment.temperature}
-                      </text>
-                      <rect 
-                        x="10" y="65" width="110" height="18" 
-                        fill="#00ff41" 
-                        rx="9"
-                        style={{cursor: 'pointer'}}
-                        onClick={() => handleShipmentSelect(shipment)}
-                      />
-                      <text x="65" y="76" fill="#0d0208" fontSize="9" textAnchor="middle" fontWeight="700">
-                        Go to Dashboard
-                      </text>
-                    </g>
-                  )}
-                  
-                  {/* Truck label */}
-                  <text 
-                    x="0" y="25" 
-                    fill={shipment.onTime ? '#00ff41' : '#ff0040'} 
-                    fontSize="8" 
-                    textAnchor="middle"
-                    fontWeight="600"
-                  >
-                    {shipment.truck}
-                  </text>
-                </g>
-              );
-            })}
-            
-            {/* Additional fleet trucks (10-15 total) */}
-            {[...Array(12)].map((_, i) => {
-              const x = 80 + (i * 55) + (Math.random() * 40);
-              const y = 100 + (Math.random() * 200);
-              const status = Math.random() > 0.25;
-              const isSemi = Math.random() > 0.4;
-              
-              return (
-                <g key={`fleet-truck-${i}`} transform={`translate(${x}, ${y})`}>
-                  <image 
-                    href={isSemi ? semiIcon : truckIcon}
-                    x="-14" y="-14" width="28" height="28"
-                    style={{
-                      opacity: status ? 1 : 0.4,
-                      filter: status ? 'none' : 'grayscale(1)'
-                    }}
-                  />
-                  <text 
-                    x="0" y="20" 
-                    fill={status ? '#00ff41' : '#666'} 
-                    fontSize="7" 
-                    textAnchor="middle"
-                    fontWeight="500"
-                  >
-                    FT-{(i + 100).toString().padStart(3, '0')}
-                  </text>
-                </g>
-              );
-            })}
-            
-            {/* Legend */}
-            <g transform="translate(620, 20)">
-              <rect x="0" y="0" width="170" height="120" fill="rgba(0, 0, 0, 0.7)" stroke="#00ff41" strokeWidth="1" rx="8"/>
-              <text x="10" y="18" fill="#00ff41" fontSize="12" fontWeight="700">Fleet Status</text>
-              
-              <image href={semiIcon} x="10" y="28" width="24" height="24"/>
-              <text x="38" y="42" fill="#e0e0e0" fontSize="9">Semi Trucks (Active)</text>
-              
-              <image href={truckIcon} x="10" y="50" width="24" height="24"/>
-              <text x="38" y="64" fill="#e0e0e0" fontSize="9">Box Trucks (Active)</text>
-              
-              <image href={truckIcon} x="10" y="72" width="24" height="24" style={{opacity: 0.4, filter: 'grayscale(1)'}}/>
-              <text x="38" y="86" fill="#666" fontSize="9">Inactive/Maintenance</text>
-              
-              <circle cx="16" cy="95" r="10" fill="none" stroke="#00ff41" strokeWidth="2"/>
-              <text x="32" y="100" fill="#e0e0e0" fontSize="9">Live Tracking</text>
-            </g>
-          </svg>
-        </div>
-        <div style={styles.mapStats}>
-          <div style={styles.mapStat}>
-            <span style={styles.mapStatLabel}>Active Trucks:</span>
-            <span style={styles.mapStatValue}>15/18</span>
+          <div style={styles.legendItem}>
+            <img src={truckIcon} style={styles.legendIcon} alt="Box truck" />
+            <span style={styles.legendText}>Box Trucks (Active)</span>
           </div>
-          <div style={styles.mapStat}>
-            <span style={styles.mapStatLabel}>On Time:</span>
-            <span style={styles.mapStatValue}>89%</span>
+          <div style={styles.legendItem}>
+            <img src={truckIcon} style={{...styles.legendIcon, opacity: 0.4, filter: 'grayscale(1)'}} alt="Inactive" />
+            <span style={styles.legendTextInactive}>Inactive/Maintenance</span>
           </div>
-          <div style={styles.mapStat}>
-            <span style={styles.mapStatLabel}>Avg Speed:</span>
-            <span style={styles.mapStatValue}>62 mph</span>
-          </div>
-          <div style={styles.mapStat}>
-            <span style={styles.mapStatLabel}>Fleet Utilization:</span>
-            <span style={styles.mapStatValue}>87%</span>
+          <div style={styles.legendItem}>
+            <div style={styles.legendPulse} />
+            <span style={styles.legendText}>Live Tracking</span>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+  <div style={styles.mapStats}>
+    <div style={styles.mapStat}>
+      <span style={styles.mapStatLabel}>Active Trucks:</span>
+      <span style={styles.mapStatValue}>15/18</span>
+    </div>
+    <div style={styles.mapStat}>
+      <span style={styles.mapStatLabel}>On Time:</span>
+      <span style={styles.mapStatValue}>89%</span>
+    </div>
+    <div style={styles.mapStat}>
+      <span style={styles.mapStatLabel}>Avg Speed:</span>
+      <span style={styles.mapStatValue}>62 mph</span>
+    </div>
+    <div style={styles.mapStat}>
+      <span style={styles.mapStatLabel}>Fleet Utilization:</span>
+      <span style={styles.mapStatValue}>87%</span>
+    </div>
+  </div>
+</div>
 
       {/* Active Shipments List */}
       <div style={styles.shipmentsCard}>
@@ -418,8 +407,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
 
         <div style={styles.shipmentsList}>
           {mockShipments.map((shipment) => (
-            <div 
-              key={shipment.id} 
+            <div
+              key={shipment.id}
               style={styles.shipmentItem}
               onClick={() => handleShipmentSelect(shipment)}
             >
@@ -431,7 +420,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   <circle cx="18.5" cy="18.5" r="2.5" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2"/>
                 </svg>
               </div>
-              
+
               <div style={styles.shipmentInfo}>
                 <div style={styles.shipmentHeader}>
                   <span style={styles.shipmentId}>{shipment.id}</span>
@@ -442,7 +431,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                     {shipment.status}
                   </span>
                 </div>
-                
+
                 <div style={styles.shipmentRoute}>
                   <span style={styles.routeOrigin}>{shipment.origin}</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={styles.routeArrow}>
@@ -450,7 +439,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   </svg>
                   <span style={styles.routeDestination}>{shipment.destination}</span>
                 </div>
-                
+
                 <div style={styles.shipmentDetails}>
                   <span style={styles.shipmentDetail}>
                     <strong>Driver:</strong> {shipment.driver}
@@ -463,11 +452,11 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   </span>
                 </div>
               </div>
-              
+
               <div style={styles.shipmentProgress}>
                 <div style={styles.progressLabel}>{shipment.progress}%</div>
                 <div style={styles.progressBar}>
-                  <div 
+                  <div
                     style={{
                       ...styles.progressFill,
                       width: `${shipment.progress}%`,
@@ -486,7 +475,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
   const renderShipmentDetails = () => (
     <div style={styles.viewContainer}>
       <div style={styles.shipmentDetailsHeader}>
-        <button 
+        <button
           style={styles.backButton}
           onClick={() => setActiveView('fleet')}
         >
@@ -524,7 +513,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
             </div>
           </div>
 
-          {/* Route Map */}
+          {/* Enhanced Route Map */}
           <div style={styles.routeMapCard}>
             <div style={styles.routeMapHeader}>
               <h3 style={styles.routeMapTitle}>Live Route Tracking</h3>
@@ -544,70 +533,58 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                 </button>
               </div>
             </div>
-            
-            <div style={styles.routeMapContainer}>
-              <svg width="100%" height="300" viewBox="0 0 600 300" style={styles.routeSvg}>
-                {/* Geofenced route */}
-                <path 
-                  d="M 30 150 Q 150 100 300 150 T 570 150" 
-                  stroke="rgba(0, 255, 65, 0.3)" 
-                  strokeWidth="20" 
-                  fill="none"
-                />
-                <path 
-                  d="M 30 150 Q 150 100 300 150 T 570 150" 
-                  stroke="#00ff41" 
-                  strokeWidth="4" 
-                  fill="none"
-                />
-                
-                {/* Origin */}
-                <circle cx="30" cy="150" r="8" fill="#00ffff"/>
-                <text x="30" y="175" textAnchor="middle" fill="#00ffff" fontSize="10">
-                  {selectedShipment.origin}
-                </text>
-                
-                {/* Destination */}
-                <circle cx="570" cy="150" r="8" fill="#ff00ff"/>
-                <text x="570" y="175" textAnchor="middle" fill="#ff00ff" fontSize="10">
-                  {selectedShipment.destination}
-                </text>
-                
-                {/* Current position */}
-                <g transform={`translate(${30 + (selectedShipment.progress * 5.4)}, 150)`}>
-                  <circle cx="0" cy="0" r="10" fill="#00ff41">
-                    <animate attributeName="r" values="10;15;10" dur="2s" repeatCount="indefinite"/>
-                  </circle>
-                  <rect x="-6" y="-4" width="12" height="8" fill="#00ff41" rx="2"/>
-                  <text x="0" y="25" textAnchor="middle" fill="#00ff41" fontSize="10" fontWeight="600">
-                    {selectedShipment.truck}
-                  </text>
-                </g>
-                
-                {/* Progress markers */}
-                <circle cx="150" cy="125" r="4" fill="#00ffff" opacity="0.7"/>
-                <text x="150" y="115" textAnchor="middle" fill="#00ffff" fontSize="8">Checkpoint 1</text>
-                
-                <circle cx="300" cy="150" r="4" fill="#00ffff" opacity="0.7"/>
-                <text x="300" y="140" textAnchor="middle" fill="#00ffff" fontSize="8">Checkpoint 2</text>
-                
-                <circle cx="450" cy="175" r="4" fill="#00ffff" opacity="0.7"/>
-                <text x="450" y="195" textAnchor="middle" fill="#00ffff" fontSize="8">Checkpoint 3</text>
-              </svg>
-            </div>
-            
-            <div style={styles.routeMetrics}>
-              <div style={styles.routeMetric}>
-                <span style={styles.metricLabel}>Progress:</span>
-                <span style={styles.metricValue}>{selectedShipment.progress}%</span>
+            <LiveMap
+              key={`dashboard-map-${selectedShipment?.id}`}
+              shipment={selectedShipment}
+              height={400}
+              showRoute={true}
+            />
+            {/* Enhanced Route Metrics */}
+            <div style={styles.enhancedRouteMetrics}>
+              <div style={styles.enhancedRouteMetric}>
+                <div style={styles.routeMetricIcon}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#00ff41" strokeWidth="2"/>
+                  </svg>
+                </div>
+                <div style={styles.routeMetricInfo}>
+                  <span style={styles.metricLabel}>Speed:</span>
+                  <span style={styles.metricValue}>67 mph</span>
+                </div>
               </div>
-              <div style={styles.routeMetric}>
-                <span style={styles.metricLabel}>Temperature:</span>
-                <span style={styles.metricValue}>{selectedShipment.temperature}</span>
+              <div style={styles.enhancedRouteMetric}>
+                <div style={styles.routeMetricIcon}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h4m6-6h4a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4m-6 0V9a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z" stroke="#00ffff" strokeWidth="2"/>
+                  </svg>
+                </div>
+                <div style={styles.routeMetricInfo}>
+                  <span style={styles.metricLabel}>Distance Remaining:</span>
+                  <span style={styles.metricValue}>{Math.round((100 - selectedShipment.progress) * 10)} miles</span>
+                </div>
               </div>
-              <div style={styles.routeMetric}>
-                <span style={styles.metricLabel}>Speed:</span>
-                <span style={styles.metricValue}>67 mph</span>
+              <div style={styles.enhancedRouteMetric}>
+                <div style={styles.routeMetricIcon}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="#ff00ff" strokeWidth="2"/>
+                    <path d="M12 6v6l4 2" stroke="#ff00ff" strokeWidth="2"/>
+                  </svg>
+                </div>
+                <div style={styles.routeMetricInfo}>
+                  <span style={styles.metricLabel}>Next Checkpoint:</span>
+                  <span style={styles.metricValue}>47 miles</span>
+                </div>
+              </div>
+              <div style={styles.enhancedRouteMetric}>
+                <div style={styles.routeMetricIcon}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#00ff41" strokeWidth="2"/>
+                  </svg>
+                </div>
+                <div style={styles.routeMetricInfo}>
+                  <span style={styles.metricLabel}>Temperature:</span>
+                  <span style={styles.metricValue}>{selectedShipment.temperature}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -747,9 +724,9 @@ const CustomerDashboard = ({ userData, onLogout }) => {
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerLeft}>
-          <img 
-            src={logoImage} 
-            alt="FreighTrix Logo" 
+          <img
+            src={logoImage}
+            alt="FreighTrix Logo"
             style={styles.logoImage}
           />
           <div style={styles.headerInfo}>
@@ -759,7 +736,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
             <p style={styles.userRole}>{userData?.role || 'Fleet Manager'}</p>
           </div>
         </div>
-        
+
         <div style={styles.headerControls}>
           <button style={styles.headerButton}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -777,7 +754,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
 
       {/* Navigation */}
       <div style={styles.navigation}>
-        <button 
+        <button
           style={{
             ...styles.navButton,
             ...(activeView === 'fleet' ? styles.navButtonActive : {})
@@ -789,9 +766,9 @@ const CustomerDashboard = ({ userData, onLogout }) => {
           </svg>
           Fleet Overview
         </button>
-        
+
         {selectedShipment && (
-          <button 
+          <button
             style={{
               ...styles.navButton,
               ...(activeView === 'shipment' ? styles.navButtonActive : {})
@@ -824,29 +801,43 @@ const CustomerDashboard = ({ userData, onLogout }) => {
 
       <style>
         {`
-          @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
-          
-          @keyframes matrixFall {
-            0% { transform: translateY(-100%); opacity: 0; }
-            50% { opacity: 1; }
-            100% { transform: translateY(100vh); opacity: 0; }
-          }
-          
-          @keyframes slideIn {
-            from { transform: translateY(30px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-          }
-          
-          @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.8; }
-          }
-
-          @keyframes glow {
-            0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 65, 0.3); }
-            50% { box-shadow: 0 0 25px rgba(0, 255, 65, 0.6); }
-          }
-        `}
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+    @keyframes matrixFall {
+      0% { transform: translateY(-100%); opacity: 0; }
+      50% { opacity: 1; }
+      100% { transform: translateY(100vh); opacity: 0; }
+    }
+    @keyframes slideIn {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.8; }
+    }
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 15px rgba(0, 255, 65, 0.3); }
+      50% { box-shadow: 0 0 25px rgba(0, 255, 65, 0.6); }
+    }
+    /* Add pulse animation for fleet overlay */
+    .pulse-animation {
+      animation: pulse-ring 2s ease-in-out infinite;
+    }
+    @keyframes pulse-ring {
+      0% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0.8;
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 0.4;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(0.8);
+        opacity: 0.8;
+      }
+    }
+  `}
       </style>
     </div>
   );
@@ -1061,6 +1052,7 @@ const styles = {
     padding: '1rem',
     border: '1px solid rgba(0, 255, 65, 0.2)',
     marginBottom: '1rem',
+    position: 'relative', // Added for positioning context
   },
   mapSvg: {
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
@@ -1364,6 +1356,38 @@ const styles = {
     alignItems: 'center',
     gap: '0.25rem',
   },
+  enhancedRouteMetrics: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '1rem',
+    marginTop: '1rem',
+  },
+  enhancedRouteMetric: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '1rem',
+    backgroundColor: 'rgba(0, 255, 65, 0.05)',
+    border: '1px solid rgba(0, 255, 65, 0.2)',
+    borderRadius: '8px',
+    backdropFilter: 'blur(10px)',
+  },
+  routeMetricIcon: {
+    width: '40px',
+    height: '40px',
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  routeMetricInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem',
+    flex: 1,
+  },
   metricLabel: {
     fontSize: '0.8rem',
     color: '#999',
@@ -1469,6 +1493,143 @@ const styles = {
     fontSize: '0.8rem',
     fontWeight: 500,
     transition: 'all 0.3s ease',
+  },
+  // Add these new styles to the existing styles object
+  fleetOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    pointerEvents: 'none',
+    zIndex: 10,
+  },
+  truckMarker: {
+    position: 'absolute',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    pointerEvents: 'auto',
+    transform: 'translate(-50%, -50%)',
+  },
+  truckIcon: {
+    width: '40px',
+    height: '40px',
+    transition: 'all 0.3s ease',
+  },
+  smallTruckIcon: {
+    width: '28px',
+    height: '28px',
+    transition: 'all 0.3s ease',
+  },
+  truckLabel: {
+    fontSize: '8px',
+    fontWeight: 600,
+    textAlign: 'center',
+    marginTop: '2px',
+    textShadow: '0 0 2px rgba(0,0,0,0.8)',
+  },
+  pulseRing: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    width: '50px',
+    height: '50px',
+    border: '2px solid #00ff41',
+    borderRadius: '50%',
+    opacity: 0.6,
+    pointerEvents: 'none',
+  },
+  shipmentInfoBubble: {
+    position: 'absolute',
+    top: '-50px',
+    left: '30px',
+    width: '200px',
+    zIndex: 20,
+    pointerEvents: 'auto',
+  },
+  infoBubbleContent: {
+    background: 'rgba(0, 255, 65, 0.15)',
+    border: '2px solid #00ff41',
+    borderRadius: '12px',
+    padding: '10px',
+    backdropFilter: 'blur(10px)',
+  },
+  bubbleTitle: {
+    color: '#00ff41',
+    fontSize: '11px',
+    fontWeight: 700,
+    marginBottom: '4px',
+  },
+  bubbleLocation: {
+    color: '#e0e0e0',
+    fontSize: '9px',
+    marginBottom: '2px',
+  },
+  bubbleStatus: {
+    color: '#00ffff',
+    fontSize: '9px',
+    marginBottom: '2px',
+  },
+  bubbleTemp: {
+    color: '#ff00ff',
+    fontSize: '9px',
+    marginBottom: '8px',
+  },
+  bubbleButton: {
+    width: '100%',
+    padding: '6px',
+    backgroundColor: '#00ff41',
+    color: '#0d0208',
+    border: 'none',
+    borderRadius: '9px',
+    fontSize: '9px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+  },
+  mapLegend: {
+    position: 'absolute',
+    top: '20px',
+    right: '20px',
+    width: '170px',
+    background: 'rgba(0, 0, 0, 0.7)',
+    border: '1px solid #00ff41',
+    borderRadius: '8px',
+    padding: '10px',
+    pointerEvents: 'auto',
+  },
+  legendTitle: {
+    color: '#00ff41',
+    fontSize: '12px',
+    fontWeight: 700,
+    marginBottom: '8px',
+  },
+  legendItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    marginBottom: '4px',
+  },
+  legendIcon: {
+    width: '24px',
+    height: '24px',
+  },
+  legendText: {
+    color: '#e0e0e0',
+    fontSize: '9px',
+  },
+  legendTextInactive: {
+    color: '#666',
+    fontSize: '9px',
+  },
+  legendPulse: {
+    width: '20px',
+    height: '20px',
+    border: '2px solid #00ff41',
+    borderRadius: '50%',
+    position: 'relative',
   },
 };
 
