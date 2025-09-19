@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { RouteUtils } from '../utils/routeUtils';
 
-const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false }) => {
+const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false, selectedRouteShipment = null }) => {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const [mapKey, setMapKey] = useState(0);
@@ -47,7 +47,7 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
   // FIXED: Use PC*MILER REST API directly (like your working ETACalculator)
   const getOptimizedRoute = async (origin, destination) => {
     setIsLoadingRoute(true);
-    
+
     try {
       console.log('🛣️ Getting road-following route using PC*MILER REST API...');
       console.log('Origin:', origin);
@@ -55,7 +55,7 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
 
       // Use PC*MILER Route Path API (same as your working backend)
       const routePathUrl = 'https://pcmiler.alk.com/apis/rest/v1.0/Service.svc/route/routePath';
-      
+
       const pathParams = new URLSearchParams({
         authToken: API_KEY,
         stops: `${origin.lng},${origin.lat};${destination.lng},${destination.lat}`,
@@ -63,7 +63,7 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
         routeType: '0',        // 0 = Practical (road-following, not straight line)
         vehDimUnits: '0',      // English units
         vehHeight: '162',      // 13.5 feet in inches
-        vehLength: '636',      // 53 feet in inches  
+        vehLength: '636',      // 53 feet in inches
         vehWidth: '102',       // 8.5 feet in inches
         vehWeight: '80000',    // 80,000 lbs
         axles: '5',            // 5 axles
@@ -88,22 +88,39 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
 
       const pathData = await pathResponse.json();
       console.log('PC*MILER routePath Response:', pathData);
+      console.log('Response keys:', Object.keys(pathData));
 
       // Extract geometry coordinates
       let coordinates = [];
-      if (pathData && pathData.Geometry) {
-        if (pathData.Geometry.type === 'LineString') {
-          coordinates = pathData.Geometry.coordinates;
-        } else if (pathData.Geometry.type === 'MultiLineString') {
+      if (pathData && (pathData.Geometry || pathData.geometry)) {
+        // Handle both uppercase and lowercase geometry property
+        const geometry = pathData.Geometry || pathData.geometry;
+
+        console.log('Geometry object:', geometry);
+        console.log('Geometry type:', geometry.type);
+        console.log('Coordinates length:', geometry.coordinates?.length);
+
+        if (geometry.type === 'LineString') {
+          coordinates = geometry.coordinates;
+          console.log('📍 Using LineString coordinates:', coordinates.length);
+        } else if (geometry.type === 'MultiLineString') {
           // Flatten MultiLineString to single coordinate array
-          coordinates = pathData.Geometry.coordinates.reduce((acc, lineString) => {
+          coordinates = geometry.coordinates.reduce((acc, lineString) => {
             acc.push(...lineString);
             return acc;
           }, []);
+          console.log('📍 Flattened MultiLineString coordinates:', coordinates.length);
+        }
+
+        console.log(`📐 Final coordinate count: ${coordinates.length}`);
+        if (coordinates.length > 0) {
+          console.log(`📍 First coordinate: [${coordinates[0]}]`);
+          console.log(`📍 Last coordinate: [${coordinates[coordinates.length - 1]}]`);
         }
       }
 
       if (!coordinates.length) {
+        console.error('❌ No coordinates extracted from geometry:', pathData.Geometry || pathData.geometry);
         throw new Error('No route coordinates returned from PC*MILER');
       }
 
@@ -115,10 +132,12 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
 
       try {
         const reportsUrl = 'https://pcmiler.alk.com/apis/rest/v1.0/Service.svc/route/routeReports';
-        
         const reportsPayload = {
           ReportRoutes: [{
-            ReportTypes: [{ __type: "MileageReportType:http://pcmiler.alk.com/APIs/v1.0" }],
+            ReportTypes: [
+              { __type: "MileageReportType:http://pcmiler.alk.com/APIs/v1.0" },
+              { __type: "FuelReportType:http://pcmiler.alk.com/APIs/v1.0" } // Add fuel report
+            ],
             Stops: [
               { Coords: { Lat: origin.lat, Lon: origin.lng }, Region: 4 },
               { Coords: { Lat: destination.lat, Lon: destination.lng }, Region: 4 }
@@ -130,7 +149,8 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
               TruckCfg: {
                 Height: 13.5,    // feet
                 Weight: 40,      // tons (80k lbs)
-                FuelEconomy: 6.5
+                FuelEconomy: 6.5,
+                FuelCapacity: 200 // gallons
               }
             }
           }]
@@ -146,14 +166,21 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
 
         if (reportsResponse.ok) {
           const reportsData = await reportsResponse.json();
-          console.log('PC*MILER Reports Response:', reportsData);
-          
+          console.log('PC*MILER Reports Response (with fuel):', reportsData);
+          // Process both mileage and fuel data
           if (reportsData && reportsData.length > 0) {
-            const mileageData = reportsData[0].ReportLines?.[reportsData[0].ReportLines.length - 1];
+            const mileageData = reportsData.find(report => report.ReportType === 'Mileage')?.ReportLines?.[reportsData[0].ReportLines.length - 1];
             if (mileageData) {
               distance = parseFloat(mileageData.TMiles) || null;
               time = parseFloat(mileageData.THours) || null;
               console.log(`Route stats: ${distance} miles, ${time} hours`);
+            }
+            // Look for fuel report data
+            const fuelReport = reportsData.find(report => report.ReportType === 'Fuel');
+            if (fuelReport) {
+              console.log('Fuel report found:', fuelReport);
+              // You can process fuel stop information from the report here
+              // For now, let's pass the raw data so it can be handled outside if needed
             }
           }
         }
@@ -176,16 +203,189 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
     } catch (error) {
       console.error('❌ PC*MILER routing failed:', error);
       setIsLoadingRoute(false);
-      
+
       // Return null to trigger fallback
       return null;
+    }
+  };
+
+  // CORRECTED: Use the exact same approach as your working Python lambda
+  const getFuelStopsAlongRoute = async (start, end) => {
+    try {
+      console.log('⛽ Getting fuel stops using exact Python lambda approach...');
+      
+      // Use the exact same endpoint as your Python code
+      const POI_ENDPOINT = "https://pcmiler.alk.com/apis/rest/v1.0/Service.svc/poi/alongRoute?dataset=Current";
+      
+      // First try fuel stops (search_type = 1)
+      const fuelPayload = {
+        "PoiRoute": {
+          "Stops": [
+            {"Coords": start, "Region": 4},
+            {"Coords": end, "Region": 4}
+          ],
+          "Options": {
+            "RoutingType": 0,  // Practical routing
+            "VehicleType": 0   // Truck
+          }
+        },
+        "RouteLegIndex": 0,
+        "SearchType": 1,  // FuelStop
+        "SearchWindowUnits": 0,  // Miles
+        "SearchWindowStart": 0,
+        "SearchWindowEnd": 2000,  // Increased range
+        "MaxMatches": 100
+      };
+
+      console.log('POI Request Payload:', JSON.stringify(fuelPayload, null, 2));
+
+      const fuelResponse = await fetch(POI_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": API_KEY  // Use Authorization header like Python
+        },
+        body: JSON.stringify(fuelPayload)
+      });
+
+      console.log('POI Response Status:', fuelResponse.status);
+      console.log('POI Response Headers:', [...fuelResponse.headers.entries()]);
+
+      let fuelStops = [];
+      
+      if (fuelResponse.status === 200) {
+        const fuelData = await fuelResponse.json();
+        console.log('POI Response Data:', fuelData);
+        
+        const fuelMatches = fuelData.POISearchMatches || [];
+        fuelStops = fuelMatches.map(poi => {
+          const location = poi.POILocation;
+          const coords = location.Coords;
+          
+          return {
+            id: poi.POIId || `fuel_${fuelStops.length}`,
+            name: location.PlaceName || location.Label || 'Fuel Station',
+            lat: parseFloat(coords.Lat),
+            lon: parseFloat(coords.Lon),
+            coordinates: [parseFloat(coords.Lon), parseFloat(coords.Lat)],
+            category: poi.POICategory || 'Fuel Stop',
+            brand: location.Brand || 'Unknown',
+            address: location.FormattedAddress || `${location.City || ''}, ${location.State || ''}`,
+            phone: location.Phone || null,
+            amenities: location.Amenities || [],
+            open: poi.OpenClosedStatus || null
+          };
+        });
+        
+        console.log(`✅ Found ${fuelStops.length} fuel stops via POI API`);
+        
+      } else if (fuelResponse.status === 402) {
+        console.log('POI API requires additional licensing, trying fallback...');
+        // Try your Single Search fallback approach
+        fuelStops = await getFuelStopsUsingSingleSearch(start, end);
+      } else {
+        const errorText = await fuelResponse.text();
+        console.warn('POI API error:', fuelResponse.status, errorText);
+        // Try fallback
+        fuelStops = await getFuelStopsUsingSingleSearch(start, end);
+      }
+
+      return fuelStops;
+      
+    } catch (error) {
+      console.error('❌ POI Along Route failed:', error);
+      // Try fallback approach
+      return await getFuelStopsUsingSingleSearch(start, end);
+    }
+  };
+
+  // Fallback using Single Search API (like your Python lambda)
+  const getFuelStopsUsingSingleSearch = async (start, end) => {
+    try {
+      console.log('⛽ Trying Single Search API fallback...');
+      
+      // Calculate midpoint and sample points along estimated route
+      const midLat = (start.Lat + end.Lat) / 2;
+      const midLon = (start.Lon + end.Lon) / 2;
+      
+      const searchPoints = [
+        { lat: start.Lat, lon: start.Lon },
+        { lat: midLat, lon: midLon },
+        { lat: end.Lat, lon: end.Lon }
+      ];
+      
+      const fuelStops = [];
+      
+      for (const point of searchPoints) {
+        try {
+          const singleSearchUrl = "https://pcmiler.alk.com/apis/rest/v1.0/Service.svc/search";
+          
+          const params = new URLSearchParams({
+            query: "truck stop",
+            currentLonLat: `${point.lon},${point.lat}`,
+            maxResults: 5,
+            authToken: API_KEY
+          });
+          
+          const response = await fetch(`${singleSearchUrl}?${params}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            const locations = data.Locations || [];
+            
+            for (const location of locations) {
+              if (location.TrimblePlaceId && location.Coords) {
+                const coords = location.Coords;
+                
+                // Avoid duplicates
+                const isDuplicate = fuelStops.some(existing => {
+                  const distance = Math.sqrt(
+                    Math.pow(existing.lat - parseFloat(coords.Lat), 2) +
+                    Math.pow(existing.lon - parseFloat(coords.Lon), 2)
+                  );
+                  return distance < 0.01; // ~0.5 mile threshold
+                });
+                
+                if (!isDuplicate) {
+                  fuelStops.push({
+                    id: location.TrimblePlaceId,
+                    name: location.PlaceName || location.ShortString || 'Truck Stop',
+                    lat: parseFloat(coords.Lat),
+                    lon: parseFloat(coords.Lon),
+                    coordinates: [parseFloat(coords.Lon), parseFloat(coords.Lat)],
+                    category: 'Truck Services',
+                    brand: 'Unknown',
+                    address: location.FormattedAddress || '',
+                    phone: null,
+                    amenities: [],
+                    open: null
+                  });
+                }
+              }
+            }
+          }
+          
+          // Add delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+        } catch (searchError) {
+          console.warn('Single Search failed for point:', point, searchError);
+        }
+      }
+      
+      console.log(`✅ Single Search fallback found ${fuelStops.length} fuel stops`);
+      return fuelStops;
+      
+    } catch (error) {
+      console.error('❌ Single Search fallback failed:', error);
+      return [];
     }
   };
 
   // Function to calculate current position along route using RouteUtils
   const getCurrentPositionOnRoute = (routeCoordinates, progress) => {
     if (!routeCoordinates || routeCoordinates.length === 0) return null;
-    
+
     try {
       // Use RouteUtils for improved position calculation
       const position = RouteUtils.getCurrentPositionOnRoute(routeCoordinates, progress, true);
@@ -200,22 +400,22 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
     const progressDecimal = progress / 100;
     const targetIndex = Math.floor(progressDecimal * (routeCoordinates.length - 1));
     const nextIndex = Math.min(targetIndex + 1, routeCoordinates.length - 1);
-    
+
     if (targetIndex === nextIndex) {
       return new window.TrimbleMaps.LngLat(
-        routeCoordinates[targetIndex][0], 
+        routeCoordinates[targetIndex][0],
         routeCoordinates[targetIndex][1]
       );
     }
-    
+
     // Interpolate between points for smoother positioning
     const segmentProgress = (progressDecimal * (routeCoordinates.length - 1)) - targetIndex;
     const currentCoord = routeCoordinates[targetIndex];
     const nextCoord = routeCoordinates[nextIndex];
-    
+
     const lng = currentCoord[0] + (nextCoord[0] - currentCoord[0]) * segmentProgress;
     const lat = currentCoord[1] + (nextCoord[1] - currentCoord[1]) * segmentProgress;
-    
+
     return new window.TrimbleMaps.LngLat(lng, lat);
   };
 
@@ -234,7 +434,7 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
     const initializeMap = async () => {
       // Route-specific coordinates based on shipment
       let originCoords, destCoords;
-      
+
       if (shipment.origin.includes('Chicago') && shipment.destination.includes('Denver')) {
         originCoords = new window.TrimbleMaps.LngLat(-87.6298, 41.8781); // Chicago
         destCoords = new window.TrimbleMaps.LngLat(-104.9903, 39.7392); // Denver
@@ -257,12 +457,21 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
 
       // Get optimized route with road-following
       let currentRoute = null;
+      let fuelStops = []; 
       if (showRoute) {
         currentRoute = await getOptimizedRoute(originCoords, destCoords);
         setRouteData(currentRoute);
-        
+
         if (currentRoute) {
           console.log('✅ Successfully got road-following route with', currentRoute.coordinates?.length, 'points');
+
+          // CORRECTED: Get fuel stops using the exact same approach as Python lambda
+          if (!isFleetView) { // Only get fuel stops for individual shipment maps
+            const startCoords = { Lat: originCoords.lat, Lon: originCoords.lng };
+            const endCoords = { Lat: destCoords.lat, Lon: destCoords.lng };
+            
+            fuelStops = await getFuelStopsAlongRoute(startCoords, endCoords);
+          }
         } else {
           console.warn('⚠️ Failed to get road-following route, will show fallback straight line');
         }
@@ -293,7 +502,7 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
       try {
         // Initialize Trimble Maps with appropriate center for fleet view
         let mapCenter, mapZoom;
-          
+
         if (isFleetView) {
           // Center on US for fleet overview
           mapCenter = new window.TrimbleMaps.LngLat(-98.5795, 39.8283);
@@ -309,13 +518,16 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
           zoom: mapZoom
         });
 
-        // Store map reference for zoom controls (add this line)
+        // Store map reference for zoom controls IMMEDIATELY after creation
         if (isFleetView) {
           window.currentFleetMap = map;
+        } else {
+          // Store individual shipment map reference using shipment ID
+          window[`shipmentMap_${shipment.id}`] = map;
         }
 
         // Apply dark theme styling
-        map.on('load', () => {
+        map.on('load', async () => {
           const mapCanvas = map.getCanvas();
           if (mapCanvas) {
             mapCanvas.style.filter = 'brightness(0.7) contrast(1.2) saturate(0.8)';
@@ -327,7 +539,7 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
             if (showRoute && currentRoute && currentRoute.coordinates) {
               try {
                 console.log('📍 Adding road-following route to map with', currentRoute.coordinates.length, 'coordinates');
-                
+
                 // Add the complete route
                 map.addSource('optimized-route', {
                   type: 'geojson',
@@ -373,10 +585,10 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
                 // Completed portion of route (if in transit)
                 if (shipment.progress > 0 && shipment.progress < 100) {
                   const completedCoordinates = currentRoute.coordinates.slice(
-                    0, 
+                    0,
                     Math.floor((shipment.progress / 100) * currentRoute.coordinates.length)
                   );
-                  
+
                   if (completedCoordinates.length > 1) {
                     map.addSource('completed-route', {
                       type: 'geojson',
@@ -453,11 +665,11 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
                 color: '#00ffff',
                 scale: 0.8
               })
-              .setLngLat(originCoords)
-              .setPopup(new window.TrimbleMaps.Popup({ 
-                offset: 25,
-                className: 'dark-popup'
-              }).setHTML(`
+                .setLngLat(originCoords)
+                .setPopup(new window.TrimbleMaps.Popup({
+                  offset: 25,
+                  className: 'dark-popup'
+                }).setHTML(`
                 <div style="background: rgba(13, 2, 8, 0.95); color: #e0e0e0; padding: 10px; border-radius: 8px; border: 1px solid #00ffff;">
                   <strong style="color: #00ffff;">Origin</strong><br/>
                   ${shipment.origin}<br/>
@@ -467,18 +679,18 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
                   ${currentRoute ? '<br/><small style="color: #00ff41;">✅ Road-Following Route</small>' : '<br/><small style="color: #ff6b6b;">⚠️ Straight-Line Fallback</small>'}
                 </div>
               `))
-              .addTo(map);
+                .addTo(map);
 
               // Current position marker (truck)
               const currentMarker = new window.TrimbleMaps.Marker({
                 color: shipment.onTime ? '#00ff41' : '#ff0040',
                 scale: 1.2
               })
-              .setLngLat(currentPosition)
-              .setPopup(new window.TrimbleMaps.Popup({ 
-                offset: 25,
-                className: 'dark-popup'
-              }).setHTML(`
+                .setLngLat(currentPosition)
+                .setPopup(new window.TrimbleMaps.Popup({
+                  offset: 25,
+                  className: 'dark-popup'
+                }).setHTML(`
                 <div style="background: rgba(13, 2, 8, 0.95); color: #e0e0e0; padding: 10px; border-radius: 8px; border: 1px solid ${shipment.onTime ? '#00ff41' : '#ff0040'};">
                   <strong style="color: ${shipment.onTime ? '#00ff41' : '#ff0040'};">${shipment.truck}</strong><br/>
                   Driver: ${shipment.driver}<br/>
@@ -490,18 +702,18 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
                   ${estimatedArrival ? `<br/><small>Remaining: ${estimatedArrival.remainingDistance} miles, ${estimatedArrival.remainingTime} min</small>` : ''}
                 </div>
               `))
-              .addTo(map);
+                .addTo(map);
 
               // Destination marker
               const destMarker = new window.TrimbleMaps.Marker({
                 color: '#ff00ff',
                 scale: 0.8
               })
-              .setLngLat(destCoords)
-              .setPopup(new window.TrimbleMaps.Popup({ 
-                offset: 25,
-                className: 'dark-popup'
-              }).setHTML(`
+                .setLngLat(destCoords)
+                .setPopup(new window.TrimbleMaps.Popup({
+                  offset: 25,
+                  className: 'dark-popup'
+                }).setHTML(`
                 <div style="background: rgba(13, 2, 8, 0.95); color: #e0e0e0; padding: 10px; border-radius: 8px; border: 1px solid #ff00ff;">
                   <strong style="color: #ff00ff;">Destination</strong><br/>
                   ${shipment.destination}<br/>
@@ -510,7 +722,49 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
                   ${estimatedArrival ? `<br/><small>Updated ETA: ${estimatedArrival.eta}</small>` : ''}
                 </div>
               `))
-              .addTo(map);
+                .addTo(map);
+
+              // ADD FUEL STOP MARKERS - Enhanced with better error handling
+              if (fuelStops && fuelStops.length > 0) {
+                console.log(`📍 Adding ${fuelStops.length} fuel stop markers to map`);
+
+                fuelStops.forEach((stop, index) => {
+                  try {
+                    // Determine fuel stop icon color based on brand
+                    let stopColor = '#ffa500'; // Default orange
+                    if (stop.brand && stop.brand.toLowerCase().includes('shell')) stopColor = '#ffff00';
+                    else if (stop.brand && stop.brand.toLowerCase().includes('exxon')) stopColor = '#ff4500';
+                    else if (stop.brand && stop.brand.toLowerCase().includes('chevron')) stopColor = '#0066cc';
+                    else if (stop.brand && stop.brand.toLowerCase().includes('bp')) stopColor = '#00ff00';
+                    else if (stop.brand && stop.brand.toLowerCase().includes('mobil')) stopColor = '#ff0000';
+                    
+                    const fuelMarker = new window.TrimbleMaps.Marker({
+                      color: stopColor,
+                      scale: 0.6
+                    })
+                      .setLngLat([stop.coordinates[0], stop.coordinates[1]])
+                      .setPopup(new window.TrimbleMaps.Popup({
+                        offset: 25,
+                        className: 'dark-popup'
+                      }).setHTML(`
+                    <div style="background: rgba(13, 2, 8, 0.95); color: #e0e0e0; padding: 10px; border-radius: 8px; border: 1px solid ${stopColor};">
+                      <strong style="color: ${stopColor};">⛽ ${stop.name}</strong><br/>
+                      <strong>Brand:</strong> ${stop.brand}<br/>
+                      <strong>Address:</strong> ${stop.address}<br/>
+                      ${stop.category ? `<strong>Type:</strong> ${stop.category}<br/>` : ''}
+                      ${stop.phone ? `<strong>Phone:</strong> ${stop.phone}<br/>` : ''}
+                      ${stop.amenities && stop.amenities.length > 0 ? `<strong>Amenities:</strong> ${stop.amenities.join(', ')}<br/>` : ''}
+                      <small style="color: #999;">Fuel Stop ${index + 1} of ${fuelStops.length}</small>
+                    </div>
+                  `))
+                      .addTo(map);
+                  } catch (markerError) {
+                    console.warn(`Error adding fuel stop marker ${index}:`, markerError);
+                  }
+                });
+              } else {
+                console.log('⚠️ No fuel stops found to display on map');
+              }
 
             } catch (error) {
               console.warn('Error adding markers:', error);
@@ -523,7 +777,7 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
                 trucks.forEach(truck => {
                   const lat = parseFloat(truck.getAttribute('data-lat'));
                   const lng = parseFloat(truck.getAttribute('data-lng'));
-                            
+
                   if (lat && lng) {
                     try {
                       const point = map.project([lng, lat]);
@@ -539,10 +793,8 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
                 });
               }, 100);
             };
-        
-            // Position trucks initially
             window.positionFleetTrucks();
-        
+
             // Reposition on map move/zoom
             map.on('move', window.positionFleetTrucks);
             map.on('zoom', window.positionFleetTrucks);
@@ -572,12 +824,15 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
             mapInstanceRef.current.off('zoom', window.positionFleetTrucks);
             delete window.positionFleetTrucks;
           }
-    
+
           // Clean up map reference
           if (isFleetView && window.currentFleetMap) {
             delete window.currentFleetMap;
+          } else if (shipment?.id) {
+            // Clean up individual shipment map reference
+            delete window[`shipmentMap_${shipment.id}`];
           }
-    
+
           mapInstanceRef.current.remove();
         } catch (error) {
           console.warn('Error removing map:', error);
@@ -593,6 +848,161 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
     }
   }, [shipment?.id]);
 
+  // Add this new useEffect after the existing map initialization useEffect
+  useEffect(() => {
+    // Handle fleet route changes without reinitializing the entire map
+    if (!isFleetView || !mapInstanceRef.current || !window.TrimbleMaps) return;
+    const map = mapInstanceRef.current;
+
+    const updateFleetRoute = async () => {
+      if (selectedRouteShipment) {
+        console.log('🗺️ Adding selected route for fleet view:', selectedRouteShipment.id);
+
+        // Get route coordinates for selected shipment
+        let routeOriginCoords, routeDestCoords;
+
+        if (selectedRouteShipment.origin.includes('Chicago') && selectedRouteShipment.destination.includes('Denver')) {
+          routeOriginCoords = new window.TrimbleMaps.LngLat(-87.6298, 41.8781);
+          routeDestCoords = new window.TrimbleMaps.LngLat(-104.9903, 39.7392);
+        } else if (selectedRouteShipment.origin.includes('Houston') && selectedRouteShipment.destination.includes('Miami')) {
+          routeOriginCoords = new window.TrimbleMaps.LngLat(-95.3698, 29.7604);
+          routeDestCoords = new window.TrimbleMaps.LngLat(-80.1918, 25.7617);
+        } else if (selectedRouteShipment.origin.includes('Los Angeles') && selectedRouteShipment.destination.includes('Seattle')) {
+          routeOriginCoords = new window.TrimbleMaps.LngLat(-118.2437, 34.0522);
+          routeDestCoords = new window.TrimbleMaps.LngLat(-122.3321, 47.6062);
+        } else {
+          routeOriginCoords = new window.TrimbleMaps.LngLat(-87.6298, 41.8781);
+          routeDestCoords = new window.TrimbleMaps.LngLat(-104.9903, 39.7392);
+        }
+        try {
+          // Clear any existing route layers first
+          const layersToRemove = ['fleet-route-outline', 'fleet-route-main', 'fleet-route-progress'];
+          const sourcesToRemove = ['fleet-route', 'fleet-route-progress'];
+
+          layersToRemove.forEach(layerId => {
+            if (map.getLayer(layerId)) {
+              map.removeLayer(layerId);
+            }
+          });
+
+          sourcesToRemove.forEach(sourceId => {
+            if (map.getSource(sourceId)) {
+              map.removeSource(sourceId);
+            }
+          });
+          // Get the route for the selected shipment
+          const selectedRoute = await getOptimizedRoute(routeOriginCoords, routeDestCoords);
+
+          if (selectedRoute && selectedRoute.coordinates) {
+            console.log('✅ Adding fleet route with', selectedRoute.coordinates.length, 'points');
+
+            // Add the route source
+            map.addSource('fleet-route', {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                properties: {},
+                geometry: selectedRoute.geometry
+              }
+            });
+            // Route outline for better visibility
+            map.addLayer({
+              id: 'fleet-route-outline',
+              type: 'line',
+              source: 'fleet-route',
+              layout: {
+                'line-join': 'round',
+                'line-cap': 'round'
+              },
+              paint: {
+                'line-color': '#000000',
+                'line-width': 6,
+                'line-opacity': 0.4
+              }
+            });
+            // Main route line
+            map.addLayer({
+              id: 'fleet-route-main',
+              type: 'line',
+              source: 'fleet-route',
+              layout: {
+                'line-join': 'round',
+                'line-cap': 'round'
+              },
+              paint: {
+                'line-color': selectedRouteShipment.onTime ? '#00ff41' : '#ff0040',
+                'line-width': 4,
+                'line-opacity': 0.8
+              }
+            });
+            // Show progress along the route
+            if (selectedRouteShipment.progress > 0 && selectedRouteShipment.progress < 100) {
+              const progressCoordinates = selectedRoute.coordinates.slice(
+                0,
+                Math.floor((selectedRouteShipment.progress / 100) * selectedRoute.coordinates.length)
+              );
+
+              if (progressCoordinates.length > 1) {
+                map.addSource('fleet-route-progress', {
+                  type: 'geojson',
+                  data: {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: progressCoordinates
+                    }
+                  }
+                });
+                map.addLayer({
+                  id: 'fleet-route-progress',
+                  type: 'line',
+                  source: 'fleet-route-progress',
+                  layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                  },
+                  paint: {
+                    'line-color': '#00ffff',
+                    'line-width': 6,
+                    'line-opacity': 0.9
+                  }
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Error adding fleet route:', error);
+        }
+      } else {
+        // Clear any existing fleet route when no shipment is selected
+        console.log('🗺️ Clearing fleet route');
+
+        const layersToRemove = ['fleet-route-outline', 'fleet-route-main', 'fleet-route-progress'];
+        const sourcesToRemove = ['fleet-route', 'fleet-route-progress'];
+
+        layersToRemove.forEach(layerId => {
+          if (map.getLayer(layerId)) {
+            map.removeLayer(layerId);
+          }
+        });
+
+        sourcesToRemove.forEach(sourceId => {
+          if (map.getSource(sourceId)) {
+            map.removeSource(sourceId);
+          }
+        });
+      }
+    };
+    // Wait a bit to ensure map is fully loaded before trying to add routes
+    const timeoutId = setTimeout(() => {
+      updateFleetRoute();
+    }, 500);
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [selectedRouteShipment, isFleetView]);
+
   // Add custom CSS for dark theme popups
   useEffect(() => {
     let style = document.getElementById('trimble-dark-theme');
@@ -601,7 +1011,7 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
       style.id = 'trimble-dark-theme';
       document.head.appendChild(style);
     }
-    
+
     style.textContent = `
       .trimblemaps-dark { background: #1a1a1a !important; }
       .dark-popup .trimblemaps-popup-content {
@@ -629,9 +1039,9 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
 
   if (!shipment) {
     return (
-      <div style={{ 
-        height, 
-        background: 'rgba(0,0,0,0.3)', 
+      <div style={{
+        height,
+        background: 'rgba(0,0,0,0.3)',
         borderRadius: '8px',
         display: 'flex',
         alignItems: 'center',
@@ -645,9 +1055,9 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
 
   if (!isLoaded) {
     return (
-      <div style={{ 
-        height, 
-        background: 'rgba(0,0,0,0.3)', 
+      <div style={{
+        height,
+        background: 'rgba(0,0,0,0.3)',
         borderRadius: '8px',
         display: 'flex',
         alignItems: 'center',
@@ -666,12 +1076,12 @@ const LiveMap = ({ shipment, height = 300, showRoute = true, isFleetView = false
           🛣️ Getting road-following route via PC*MILER...
         </div>
       )}
-      <div 
-        ref={mapRef} 
-        style={{ 
-          height, 
-          borderRadius: '8px', 
-          overflow: 'hidden', 
+      <div
+        ref={mapRef}
+        style={{
+          height,
+          borderRadius: '8px',
+          overflow: 'hidden',
           border: '1px solid rgba(0, 255, 65, 0.2)'
         }}
       />

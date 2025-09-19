@@ -24,61 +24,83 @@ const CustomerDashboard = ({ userData, onLogout }) => {
   const [activeTooltip, setActiveTooltip] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
 
+  // Add this state at the top of CustomerDashboard component:
+  const [mapControlsReady, setMapControlsReady] = useState(false);
+
+  // Add state for route selection:
+  const [selectedRouteShipment, setSelectedRouteShipment] = useState(null);
+
+  // Optional: Add state for fuel stop filtering
+  const [showFuelStops, setShowFuelStops] = useState(true);
+
   // Mock shipment data
   // Replace the mockShipments array with this reduced version
   const mockShipments = [
-      {
-        id: 'FT-2024-1247',
-        status: 'In Transit',
-        origin: 'Chicago, IL',
-        destination: 'Denver, CO',
-        driver: 'Marcus Rodriguez',
-        truck: 'FT-TR-456',
-        currentLocation: 'Des Moines, IA',
-        temperature: '4.2°C',
-        eta: 'Dec 15, 2:30 PM',
-        onTime: true,
-        progress: 45,
-        lat: 41.5868,
-        lng: -93.6250,
-        cargo: 'Pharmaceuticals',
-        value: '$2.3M'
-      },
-      {
-        id: 'FT-2024-1248',
-        status: 'In Transit',
-        origin: 'Houston, TX',
-        destination: 'Miami, FL',
-        driver: 'Sarah Johnson',
-        truck: 'FT-TR-892',
-        currentLocation: 'Tallahassee, FL',
-        temperature: '2.1°C',
-        eta: 'Dec 16, 10:00 AM',
-        onTime: true,
-        progress: 75,
-        lat: 30.4383,
-        lng: -84.2807,
-        cargo: 'Medical Supplies',
-        value: '$1.8M'
-      },
-      {
-        id: 'FT-2024-1249',
-        status: 'In Transit',
-        origin: 'Los Angeles, CA',
-        destination: 'Seattle, WA',
-        driver: 'Mike Chen',
-        truck: 'FT-TR-123',
-        currentLocation: 'Grants Pass, OR',
-        temperature: 'Ambient',
-        eta: 'Dec 15, 6:00 PM',
-        onTime: false,
-        progress: 70,
-        lat: 42.4390,
-        lng: -123.3298,
-        cargo: 'Electronics',
-        value: '$875K'
+    {
+      id: 'FT-2024-1247',
+      status: 'In Transit',
+      origin: 'Chicago, IL',
+      destination: 'Denver, CO',
+      driver: 'Marcus Rodriguez',
+      truck: 'FT-TR-456',
+      currentLocation: 'Des Moines, IA',
+      temperature: '4.2°C',
+      eta: 'Dec 15, 2:30 PM',
+      onTime: true,
+      progress: 45,
+      lat: 41.5868,
+      lng: -93.6250,
+      cargo: 'Pharmaceuticals',
+      value: '$2.3M',
+      // Added fuel stop data for this shipment
+      fuelStops: {
+        planned: 3,
+        next: { distance: 247, time: 4.2 }
       }
-    ];
+    },
+    {
+      id: 'FT-2024-1248',
+      status: 'In Transit',
+      origin: 'Houston, TX',
+      destination: 'Miami, FL',
+      driver: 'Sarah Johnson',
+      truck: 'FT-TR-892',
+      currentLocation: 'Tallahassee, FL',
+      temperature: '2.1°C',
+      eta: 'Dec 16, 10:00 AM',
+      onTime: true,
+      progress: 75,
+      lat: 30.4383,
+      lng: -84.2807,
+      cargo: 'Medical Supplies',
+      value: '$1.8M',
+      fuelStops: {
+        planned: 2,
+        next: { distance: 110, time: 2.1 }
+      }
+    },
+    {
+      id: 'FT-2024-1249',
+      status: 'In Transit',
+      origin: 'Los Angeles, CA',
+      destination: 'Seattle, WA',
+      driver: 'Mike Chen',
+      truck: 'FT-TR-123',
+      currentLocation: 'Grants Pass, OR',
+      temperature: 'Ambient',
+      eta: 'Dec 15, 6:00 PM',
+      onTime: false,
+      progress: 70,
+      lat: 42.4390,
+      lng: -123.3298,
+      cargo: 'Electronics',
+      value: '$875K',
+      fuelStops: {
+        planned: 4,
+        next: { distance: 85, time: 1.5 }
+      }
+    }
+  ];
 
   useEffect(() => {
     const pulseInterval = setInterval(() => {
@@ -133,6 +155,21 @@ const CustomerDashboard = ({ userData, onLogout }) => {
       return () => mapContainer.removeEventListener('click', handleMapInteraction);
     }
   }, [activeTooltip]);
+
+  // Add this useEffect to check for map readiness:
+  useEffect(() => {
+    const checkMapControls = () => {
+      if (window.currentFleetMap) {
+        setMapControlsReady(true);
+      } else {
+        setMapControlsReady(false);
+      }
+    };
+    // Check immediately and then periodically
+    checkMapControls();
+    const interval = setInterval(checkMapControls, 1000);
+    return () => clearInterval(interval);
+  }, [activeView]);
 
   const handleShipmentSelect = (shipment) => {
     setSelectedShipment(shipment);
@@ -200,22 +237,26 @@ const CustomerDashboard = ({ userData, onLogout }) => {
     setDocumentType('');
   };
 
-  // Add this function after handleCloseDocumentViewer
+  // Replace the existing handleTruckClick function:
   const handleTruckClick = (shipment, event) => {
     event.stopPropagation(); // Prevent any parent click handlers
-  
+
     if (activeTooltip === shipment.id) {
-      // If clicking the same truck, close tooltip
+      // If clicking the same truck, close tooltip and clear route
       setActiveTooltip(null);
+      setSelectedRouteShipment(null);
     } else {
       // Get click position relative to the map container
       const mapContainer = event.currentTarget.closest('[style*="position: relative"]');
       const rect = mapContainer.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-          
+
       setTooltipPosition({ x, y });
       setActiveTooltip(shipment.id);
+
+      // Show this shipment's route on the fleet map
+      setSelectedRouteShipment(shipment);
     }
   };
 
@@ -228,7 +269,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
   const getRealisticMapPosition = (location) => {
     // Map real locations to approximate pixel positions on a 1200x400 US map
     const locationMap = {
-      'Des Moines, IA': { x: 520, y: 180 },      // Chicago to Denver route
+      'Des Moines, IA': { x: 520, y: 180 },     // Chicago to Denver route
       'Tallahassee, FL': { x: 700, y: 350 },     // Houston to Miami route
       'Grants Pass, OR': { x: 100, y: 140 },     // Los Angeles to Seattle route
       'Chicago, IL': { x: 560, y: 160 },
@@ -240,8 +281,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
     };
     return locationMap[location] || { x: 500, y: 200 }; // Default to center US
   };
-  
-  const getRealisticFleetPositions = () => {  // Return empty array - we only want to show the actual shipment trucks  
+
+  const getRealisticFleetPositions = () => { // Return empty array - we only want to show the actual shipment trucks
     return [];
   };
 
@@ -253,12 +294,12 @@ const CustomerDashboard = ({ userData, onLogout }) => {
       trucks.forEach(truck => {
         const lat = parseFloat(truck.getAttribute('data-lat'));
         const lng = parseFloat(truck.getAttribute('data-lng'));
-              
+
         if (lat && lng && mapInstance) {
           try {
             // Convert lat/lng to pixel coordinates using Trimble Maps
             const point = mapInstance.project([lng, lat]);
-                      
+
             // Position the truck overlay at the correct pixel location
             truck.style.left = `${point.x}px`;
             truck.style.top = `${point.y}px`;
@@ -273,6 +314,13 @@ const CustomerDashboard = ({ userData, onLogout }) => {
     }, 500);
   };
 
+  // Update button style to show disabled state:
+  const getMapControlStyle = () => ({
+    ...styles.mapControl,
+    opacity: mapControlsReady ? 1 : 0.5,
+    cursor: mapControlsReady ? 'pointer' : 'not-allowed',
+  });
+
   const renderFleetOverview = () => (
     <div style={styles.viewContainer}>
       {/* Fleet Statistics */}
@@ -280,10 +328,10 @@ const CustomerDashboard = ({ userData, onLogout }) => {
         <div style={styles.statCard}>
           <div style={styles.statIcon}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <rect x="1" y="3" width="15" height="13" stroke="#00ff41" strokeWidth="2"/>
-              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke="#00ff41" strokeWidth="2"/>
-              <circle cx="5.5" cy="18.5" r="2.5" stroke="#00ff41" strokeWidth="2"/>
-              <circle cx="18.5" cy="18.5" r="2.5" stroke="#00ff41" strokeWidth="2"/>
+              <rect x="1" y="3" width="15" height="13" stroke="#00ff41" strokeWidth="2" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke="#00ff41" strokeWidth="2" />
+              <circle cx="5.5" cy="18.5" r="2.5" stroke="#00ff41" strokeWidth="2" />
+              <circle cx="18.5" cy="18.5" r="2.5" stroke="#00ff41" strokeWidth="2" />
             </svg>
           </div>
           <div style={styles.statContent}>
@@ -295,7 +343,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
         <div style={styles.statCard}>
           <div style={styles.statIcon}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <polygon points="3 6 9 9 15 15 21 12 21 18 15 21 9 15 3 12" stroke="#00ffff" strokeWidth="2"/>
+              <polygon points="3 6 9 9 15 15 21 12 21 18 15 21 9 15 3 12" stroke="#00ffff" strokeWidth="2" />
             </svg>
           </div>
           <div style={styles.statContent}>
@@ -307,7 +355,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
         <div style={styles.statCard}>
           <div style={styles.statIcon}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <polyline points="20,6 9,17 4,12" stroke="#ff00ff" strokeWidth="2"/>
+              <polyline points="20,6 9,17 4,12" stroke="#ff00ff" strokeWidth="2" />
             </svg>
           </div>
           <div style={styles.statContent}>
@@ -319,8 +367,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
         <div style={styles.statCard}>
           <div style={styles.statIcon}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="#00ff41" strokeWidth="2"/>
-              <path d="M12 6v6l4 2" stroke="#00ff41" strokeWidth="2"/>
+              <circle cx="12" cy="12" r="10" stroke="#00ff41" strokeWidth="2" />
+              <path d="M12 6v6l4 2" stroke="#00ff41" strokeWidth="2" />
             </svg>
           </div>
           <div style={styles.statContent}>
@@ -336,47 +384,82 @@ const CustomerDashboard = ({ userData, onLogout }) => {
           <h3 style={styles.mapTitle}>Live Fleet Tracking</h3>
           <div style={styles.mapControls}>
             <button
-              style={styles.mapControl}
+              style={getMapControlStyle()}
               onClick={() => {
-                if (window.currentFleetMap) {
-                  window.currentFleetMap.zoomIn();
+                try {
+                  if (window.currentFleetMap && typeof window.currentFleetMap.zoomIn === 'function') {
+                    window.currentFleetMap.zoomIn();
+                  } else if (window.currentFleetMap) {
+                    // Fallback using setZoom
+                    const currentZoom = window.currentFleetMap.getZoom();
+                    window.currentFleetMap.setZoom(currentZoom + 1);
+                  } else {
+                    console.warn('Fleet map not available for zoom control');
+                  }
+                } catch (error) {
+                  console.error('Error zooming in:', error);
                 }
-              }}
-            >
+              }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" strokeWidth="2"/>
-                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" strokeWidth="2" />
+                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2" />
               </svg>
               Zoom In
             </button>
             <button
-              style={styles.mapControl}
+              style={getMapControlStyle()}
               onClick={() => {
-                if (window.currentFleetMap) {
-                  window.currentFleetMap.zoomOut();
+                try {
+                  if (window.currentFleetMap && typeof window.currentFleetMap.zoomOut === 'function') {
+                    window.currentFleetMap.zoomOut();
+                  } else if (window.currentFleetMap) {
+                    // Fallback using setZoom
+                    const currentZoom = window.currentFleetMap.getZoom();
+                    window.currentFleetMap.setZoom(Math.max(currentZoom - 1, 1)); // Prevent zoom too far out
+                  } else {
+                    console.warn('Fleet map not available for zoom control');
+                  }
+                } catch (error) {
+                  console.error('Error zooming out:', error);
                 }
-              }}
-            >
+              }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2"/>
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2" />
               </svg>
               Zoom Out
             </button>
+            <button
+              style={{
+                ...styles.mapControl,
+                backgroundColor: selectedRouteShipment ? 'rgba(0, 255, 65, 0.2)' : 'rgba(0, 255, 65, 0.1)',
+                borderColor: selectedRouteShipment ? '#00ff41' : 'rgba(0, 255, 65, 0.3)',
+              }}
+              onClick={() => {
+                // Clear selected route
+                setSelectedRouteShipment(null);
+                setActiveTooltip(null);
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <polygon points="3 11 22 2 13 21 11 13 3 11" stroke="currentColor" strokeWidth="2" />
+              </svg>
+              {selectedRouteShipment ? 'Clear Route' : 'Show Route'}
+            </button>
             <button style={styles.mapControl}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <polyline points="23 4 23 10 17 10" stroke="currentColor" strokeWidth="2"/>
-                <polyline points="1 20 1 14 7 14" stroke="currentColor" strokeWidth="2"/>
-                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2"/>
+                <polyline points="23 4 23 10 17 10" stroke="currentColor" strokeWidth="2" />
+                <polyline points="1 20 1 14 7 14" stroke="currentColor" strokeWidth="2" />
+                <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" strokeWidth="2" />
               </svg>
               Refresh
             </button>
             <button style={styles.mapControl}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
-                <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2"/>
-                <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2"/>
+                <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
+                <line x1="8" y1="21" x2="16" y2="21" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="17" x2="12" y2="21" stroke="currentColor" strokeWidth="2" />
               </svg>
               Full Screen
             </button>
@@ -387,10 +470,11 @@ const CustomerDashboard = ({ userData, onLogout }) => {
           <div style={{ position: 'relative' }}>
             <LiveMap
               key="fleet-overview-map"
-              shipment={mockShipments[0]} // Primary shipment for route
+              shipment={mockShipments[0]} // Primary shipment for map centering
               height={400}
-              showRoute={false} // Don't show individual route
+              showRoute={false} // Don't show default route
               isFleetView={true}
+              selectedRouteShipment={selectedRouteShipment} // Pass selected route shipment
               onMapLoad={positionTrucksOnMap}
             />
             {/* Fleet Overlay Container */}
@@ -399,7 +483,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               {mockShipments.map((shipment, index) => {
                 // Skip if this is not an in-transit shipment (for cleaner display)
                 if (shipment.status !== 'In Transit') return null;
-                
+
                 return (
                   <div
                     key={shipment.id}
@@ -448,8 +532,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               })}
               {/* Dynamic Tooltip */}
               {activeTooltip && (
-                <div 
-                   style={{
+                <div
+                  style={{
                     ...styles.dynamicTooltip,
                     left: `${tooltipPosition.x}px`,
                     top: `${tooltipPosition.y}px`,
@@ -459,56 +543,56 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   {(() => {
                     const shipment = mockShipments.find(s => s.id === activeTooltip);
                     if (!shipment) return null;
-                            
+
                     return (
                       <div style={styles.tooltipContent}>
                         <div style={styles.tooltipHeader}>
                           <div style={styles.tooltipTitle}>{shipment.id}</div>
-                          <button 
+                          <button
                             style={styles.tooltipClose}
                             onClick={() => setActiveTooltip(null)}
                           >
                             ×
                           </button>
                         </div>
-                                    
+
                         <div style={styles.tooltipBody}>
                           <div style={styles.tooltipRow}>
                             <span style={styles.tooltipIcon}>📍</span>
                             <span style={styles.tooltipText}>{shipment.currentLocation}</span>
                           </div>
-                                        
+
                           <div style={styles.tooltipRow}>
                             <span style={styles.tooltipIcon}>👤</span>
                             <span style={styles.tooltipText}>{shipment.driver}</span>
                           </div>
-                                        
+
                           <div style={styles.tooltipRow}>
                             <span style={styles.tooltipIcon}>🚛</span>
                             <span style={styles.tooltipText}>{shipment.truck}</span>
                           </div>
-                                        
+
                           <div style={styles.tooltipRow}>
                             <span style={styles.tooltipIcon}>⏰</span>
                             <span style={styles.tooltipText}>
                               {shipment.onTime ? 'On Time' : 'Delayed'} • ETA: {shipment.eta.split(' ')[2]}
                             </span>
                           </div>
-                                        
+
                           <div style={styles.tooltipRow}>
                             <span style={styles.tooltipIcon}>🌡️</span>
                             <span style={styles.tooltipText}>Temp: {shipment.temperature}</span>
                           </div>
-                                        
+
                           <div style={styles.tooltipRow}>
                             <span style={styles.tooltipIcon}>📦</span>
                             <span style={styles.tooltipText}>{shipment.cargo}</span>
                           </div>
-                                        
+
                           <div style={styles.tooltipProgress}>
                             <span style={styles.tooltipProgressLabel}>Progress: {shipment.progress}%</span>
                             <div style={styles.tooltipProgressBar}>
-                              <div 
+                              <div
                                 style={{
                                   ...styles.tooltipProgressFill,
                                   width: `${shipment.progress}%`,
@@ -518,7 +602,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                             </div>
                           </div>
                         </div>
-                                    
+
                         <div style={styles.tooltipFooter}>
                           <button
                             style={styles.tooltipViewButton}
@@ -535,7 +619,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   })()}
                 </div>
               )}
-                  
+
               {/* Legend Overlay - same as before */}
               <div style={styles.mapLegend}>
                 <div style={styles.legendTitle}>Fleet Status</div>
@@ -582,13 +666,13 @@ const CustomerDashboard = ({ userData, onLogout }) => {
           <div style={styles.shipmentsControls}>
             <button style={styles.filterButton}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" stroke="currentColor" strokeWidth="2"/>
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" stroke="currentColor" strokeWidth="2" />
               </svg>
               Filter
             </button>
             <button style={styles.sortButton}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M3 6h18M7 12h10m-7 6h4" stroke="currentColor" strokeWidth="2"/>
+                <path d="M3 6h18M7 12h10m-7 6h4" stroke="currentColor" strokeWidth="2" />
               </svg>
               Sort
             </button>
@@ -604,10 +688,10 @@ const CustomerDashboard = ({ userData, onLogout }) => {
             >
               <div style={styles.shipmentIcon}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <rect x="1" y="3" width="15" height="13" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2"/>
-                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2"/>
-                  <circle cx="5.5" cy="18.5" r="2.5" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2"/>
-                  <circle cx="18.5" cy="18.5" r="2.5" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2"/>
+                  <rect x="1" y="3" width="15" height="13" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2" />
+                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2" />
+                  <circle cx="5.5" cy="18.5" r="2.5" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2" />
+                  <circle cx="18.5" cy="18.5" r="2.5" stroke={shipment.onTime ? '#00ff41' : '#ff0040'} strokeWidth="2" />
                 </svg>
               </div>
 
@@ -625,7 +709,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                 <div style={styles.shipmentRoute}>
                   <span style={styles.routeOrigin}>{shipment.origin}</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={styles.routeArrow}>
-                    <path d="M5 12h14M12 5l7 7-7 7" stroke="#00ffff" strokeWidth="2"/>
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="#00ffff" strokeWidth="2" />
                   </svg>
                   <span style={styles.routeDestination}>{shipment.destination}</span>
                 </div>
@@ -670,7 +754,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
           onClick={() => setActiveView('fleet')}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="2"/>
+            <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" strokeWidth="2" />
           </svg>
           Back to Fleet
         </button>
@@ -708,16 +792,67 @@ const CustomerDashboard = ({ userData, onLogout }) => {
             <div style={styles.routeMapHeader}>
               <h3 style={styles.routeMapTitle}>Live Route Tracking</h3>
               <div style={styles.routeMapControls}>
+                <button
+                  style={styles.routeControl}
+                  onClick={() => {
+                    try {
+                      const mapInstance = window[`shipmentMap_${selectedShipment?.id}`];
+                      if (mapInstance && typeof mapInstance.zoomIn === 'function') {
+                        mapInstance.zoomIn();
+                      } else if (mapInstance) {
+                        const currentZoom = mapInstance.getZoom();
+                        mapInstance.setZoom(currentZoom + 1);
+                      } else {
+                        console.warn('Shipment map not available for zoom control');
+                      }
+                    } catch (error) {
+                      console.error('Error zooming in:', error);
+                    }
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                    <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" strokeWidth="2" />
+                    <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                  Zoom In
+                </button>
+
+                <button
+                  style={styles.routeControl}
+                  onClick={() => {
+                    try {
+                      const mapInstance = window[`shipmentMap_${selectedShipment?.id}`];
+                      if (mapInstance && typeof mapInstance.zoomOut === 'function') {
+                        mapInstance.zoomOut();
+                      } else if (mapInstance) {
+                        const currentZoom = mapInstance.getZoom();
+                        mapInstance.setZoom(Math.max(currentZoom - 1, 1));
+                      } else {
+                        console.warn('Shipment map not available for zoom control');
+                      }
+                    } catch (error) {
+                      console.error('Error zooming out:', error);
+                    }
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                    <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2" />
+                  </svg>
+                  Zoom Out
+                </button>
+
                 <button style={styles.routeControl}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2"/>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                    <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" />
                   </svg>
                   Live
                 </button>
                 <button style={styles.routeControl}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <polygon points="3 11 22 2 13 21 11 13 3 11" stroke="currentColor" strokeWidth="2"/>
+                    <polygon points="3 11 22 2 13 21 11 13 3 11" stroke="currentColor" strokeWidth="2" />
                   </svg>
                   Route
                 </button>
@@ -734,7 +869,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.enhancedRouteMetric}>
                 <div style={styles.routeMetricIcon}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#00ff41" strokeWidth="2"/>
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#00ff41" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.routeMetricInfo}>
@@ -745,7 +880,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.enhancedRouteMetric}>
                 <div style={styles.routeMetricIcon}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h4m6-6h4a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4m-6 0V9a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z" stroke="#00ffff" strokeWidth="2"/>
+                    <path d="M9 11H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h4m6-6h4a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4m-6 0V9a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2z" stroke="#00ffff" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.routeMetricInfo}>
@@ -756,8 +891,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.enhancedRouteMetric}>
                 <div style={styles.routeMetricIcon}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="#ff00ff" strokeWidth="2"/>
-                    <path d="M12 6v6l4 2" stroke="#ff00ff" strokeWidth="2"/>
+                    <circle cx="12" cy="12" r="10" stroke="#ff00ff" strokeWidth="2" />
+                    <path d="M12 6v6l4 2" stroke="#ff00ff" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.routeMetricInfo}>
@@ -768,7 +903,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.enhancedRouteMetric}>
                 <div style={styles.routeMetricIcon}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#00ff41" strokeWidth="2"/>
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#00ff41" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.routeMetricInfo}>
@@ -824,6 +959,143 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                 </div>
               </div>
             </div>
+
+            {/* NEW: Trip Information Section */}
+            <div style={styles.detailCard}>
+              <h4 style={styles.detailTitle}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="#00ff41" strokeWidth="2" />
+                  <circle cx="12" cy="10" r="3" stroke="#00ff41" strokeWidth="2" />
+                </svg>
+                Trip Information
+              </h4>
+              <div style={styles.detailContent}>
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>Route Distance:</span>
+                  <span style={styles.detailValue}>1,004 miles</span>
+                </div>
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>Est. Drive Time:</span>
+                  <span style={styles.detailValue}>18.5 hours</span>
+                </div>
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>Fuel Efficiency:</span>
+                  <span style={styles.detailValue}>6.2 MPG</span>
+                </div>
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>Route Type:</span>
+                  <span style={styles.detailValue}>PC*MILER Practical</span>
+                </div>
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>Toll Costs:</span>
+                  <span style={styles.detailValue}>$89.50</span>
+                </div>
+                {/* Add fuel stops to the trip information sections */}
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>Fuel Stops:</span>
+                  <span style={styles.detailValue}>3 Planned</span>
+                </div>
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>HOS Compliance:</span>
+                  <span style={{ ...styles.detailValue, color: '#00ff41' }}>On Track</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* NEW: Advanced Trip Analytics Section */}
+          <div style={styles.tripAnalyticsCard}>
+            <h4 style={styles.tripAnalyticsTitle}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+                <path d="M3 3v18h18" stroke="#00ffff" strokeWidth="2" />
+                <path d="M8 17l4-4 4 4" stroke="#00ffff" strokeWidth="2" />
+              </svg>
+              Advanced Trip Analytics
+            </h4>
+            <div style={styles.tripAnalyticsGrid}>
+              <div style={styles.tripAnalyticItem}>
+                <div style={styles.analyticIcon}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="#00ff41" strokeWidth="2" />
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="#00ff41" strokeWidth="2" />
+                    <path d="M12 17h.01" stroke="#00ff41" strokeWidth="2" />
+                  </svg>
+                </div>
+                <div style={styles.analyticDetails}>
+                  <div style={styles.analyticLabel}>Route Optimization</div>
+                  <div style={styles.analyticValue}>97% Efficient</div>
+                  <div style={styles.analyticSubtext}>Saved 47 miles vs. standard route</div>
+                </div>
+              </div>
+              <div style={styles.tripAnalyticItem}>
+                <div style={styles.analyticIcon}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="#00ffff" strokeWidth="2" />
+                    <circle cx="8.5" cy="7" r="4" stroke="#00ffff" strokeWidth="2" />
+                    <path d="M20 8v6M23 11l-3 3-3-3" stroke="#00ffff" strokeWidth="2" />
+                  </svg>
+                </div>
+                <div style={styles.analyticDetails}>
+                  <div style={styles.analyticLabel}>Traffic Conditions</div>
+                  <div style={styles.analyticValue}>Moderate</div>
+                  <div style={styles.analyticSubtext}>15 min delay expected in Denver</div>
+                </div>
+              </div>
+              <div style={styles.tripAnalyticItem}>
+                <div style={styles.analyticIcon}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#ff00ff" strokeWidth="2" />
+                  </svg>
+                </div>
+                <div style={styles.analyticDetails}>
+                  <div style={styles.analyticLabel}>Weather Alert</div>
+                  <div style={styles.analyticValue}>Clear</div>
+                  <div style={styles.analyticSubtext}>No weather delays expected</div>
+                </div>
+              </div>
+              <div style={styles.tripAnalyticItem}>
+                <div style={styles.analyticIcon}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" stroke="#00ff41" strokeWidth="2" />
+                    <line x1="8" y1="21" x2="16" y2="21" stroke="#00ff41" strokeWidth="2" />
+                    <line x1="12" y1="17" x2="12" y2="21" stroke="#00ff41" strokeWidth="2" />
+                  </svg>
+                </div>
+                <div style={styles.analyticDetails}>
+                  <div style={styles.analyticLabel}>Trimble Integration</div>
+                  <div style={styles.analyticValue}>Active</div>
+                  <div style={styles.analyticSubtext}>Real-time GPS & route guidance</div>
+                </div>
+              </div>
+              <div style={styles.tripAnalyticItem}>
+                <div style={styles.analyticIcon}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="3" stroke="#ff00ff" strokeWidth="2" />
+                    <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24" stroke="#ff00ff" strokeWidth="2" />
+                  </svg>
+                </div>
+                <div style={styles.analyticDetails}>
+                  <div style={styles.analyticLabel}>Alt Routes</div>
+                  <div style={styles.analyticValue}>2 Available</div>
+                  <div style={styles.analyticSubtext}>+12 min, +31 min options</div>
+                </div>
+              </div>
+              {/* Update the Advanced Trip Analytics section */}
+              <div style={styles.tripAnalyticItem}>
+                <div style={styles.analyticIcon}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <circle cx="9" cy="21" r="1" stroke="#00ffff" strokeWidth="2" />
+                    <circle cx="20" cy="21" r="1" stroke="#00ffff" strokeWidth="2" />
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" stroke="#00ffff" strokeWidth="2" />
+                  </svg>
+                </div>
+                <div style={styles.analyticDetails}>
+                  <div style={styles.analyticLabel}>Fuel Stops</div>
+                  <div style={styles.analyticValue}>3 Planned</div>
+                  <div style={styles.analyticSubtext}>Next: 247 miles (4.2 hrs)</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Documentation */}
@@ -833,8 +1105,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.documentItem}>
                 <div style={styles.documentIcon}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#00ff41" strokeWidth="2"/>
-                    <polyline points="14,2 14,8 20,8" stroke="#00ff41" strokeWidth="2"/>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#00ff41" strokeWidth="2" />
+                    <polyline points="14,2 14,8 20,8" stroke="#00ff41" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.documentInfo}>
@@ -851,8 +1123,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.documentItem}>
                 <div style={styles.documentIcon}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <rect x="2" y="7" width="20" height="15" rx="2" ry="2" stroke="#00ffff" strokeWidth="2"/>
-                    <polyline points="17,2 12,7 7,2" stroke="#00ffff" strokeWidth="2"/>
+                    <rect x="2" y="7" width="20" height="15" rx="2" ry="2" stroke="#00ffff" strokeWidth="2" />
+                    <polyline points="17,2 12,7 7,2" stroke="#00ffff" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.documentInfo}>
@@ -869,7 +1141,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.documentItem}>
                 <div style={styles.documentIcon}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#ff00ff" strokeWidth="2"/>
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#ff00ff" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.documentInfo}>
@@ -930,13 +1202,13 @@ const CustomerDashboard = ({ userData, onLogout }) => {
         <div style={styles.headerControls}>
           <button style={styles.headerButton}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="2"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="2"/>
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="2" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="2" />
             </svg>
           </button>
           <button style={styles.headerButton} onClick={onLogout}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="2"/>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="2" />
             </svg>
           </button>
         </div>
@@ -952,7 +1224,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
           onClick={() => setActiveView('fleet')}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <polygon points="3 6 9 9 15 15 21 12 21 18 15 21 9 15 3 12" stroke="currentColor" strokeWidth="2"/>
+            <polygon points="3 6 9 9 15 15 21 12 21 18 15 21 9 15 3 12" stroke="currentColor" strokeWidth="2" />
           </svg>
           Fleet Overview
         </button>
@@ -966,10 +1238,10 @@ const CustomerDashboard = ({ userData, onLogout }) => {
             onClick={() => setActiveView('shipment')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <rect x="1" y="3" width="15" height="13" stroke="currentColor" strokeWidth="2"/>
-              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="5.5" cy="18.5" r="2.5" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="18.5" cy="18.5" r="2.5" stroke="currentColor" strokeWidth="2"/>
+              <rect x="1" y="3" width="15" height="13" stroke="currentColor" strokeWidth="2" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke="currentColor" strokeWidth="2" />
+              <circle cx="5.5" cy="18.5" r="2.5" stroke="currentColor" strokeWidth="2" />
+              <circle cx="18.5" cy="18.5" r="2.5" stroke="currentColor" strokeWidth="2" />
             </svg>
             Shipment Details
           </button>
@@ -1209,8 +1481,9 @@ const styles = {
     display: 'flex',
     gap: '0.5rem',
   },
+  // Update the mapControl style in CustomerDashboard.js:
   mapControl: {
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
     border: '1px solid rgba(0, 255, 65, 0.3)',
     borderRadius: '6px',
     padding: '0.5rem 0.75rem',
@@ -1221,6 +1494,12 @@ const styles = {
     gap: '0.5rem',
     fontSize: '0.8rem',
     transition: 'all 0.3s ease',
+    minWidth: '80px', // Add minimum width
+    justifyContent: 'center', // Center content
+    ':hover': {
+      backgroundColor: 'rgba(0, 255, 65, 0.2)',
+      borderColor: '#00ff41',
+    },
   },
   mapContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -1949,6 +2228,66 @@ const styles = {
     transition: 'all 0.3s ease',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
+  },
+  tripAnalyticsCard: {
+    backgroundColor: 'rgba(0, 255, 65, 0.03)',
+    border: '1px solid rgba(0, 255, 65, 0.15)',
+    borderRadius: '12px',
+    padding: '1.5rem',
+    marginBottom: '1.5rem',
+  },
+  tripAnalyticsTitle: {
+    fontFamily: 'Orbitron, sans-serif',
+    fontSize: '1.1rem',
+    fontWeight: 600,
+    color: '#00ffff',
+    margin: '0 0 1rem 0',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  tripAnalyticsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gap: '1rem',
+  },
+  tripAnalyticItem: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '1rem',
+    padding: '1rem',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    border: '1px solid rgba(0, 255, 65, 0.1)',
+    borderRadius: '8px',
+    transition: 'all 0.3s ease',
+  },
+  analyticIcon: {
+    width: '48px',
+    height: '48px',
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  analyticDetails: {
+    flex: 1,
+  },
+  analyticLabel: {
+    fontSize: '0.9rem',
+    color: '#e0e0e0',
+    fontWeight: 500,
+    marginBottom: '0.25rem',
+  },
+  analyticValue: {
+    fontSize: '1rem',
+    fontWeight: 600,
+    color: '#00ff41',
+    marginBottom: '0.25rem',
+  },
+  analyticSubtext: {
+    fontSize: '0.7rem',
+    color: '#666',
   },
 };
 

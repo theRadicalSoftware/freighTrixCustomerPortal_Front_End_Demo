@@ -113,6 +113,35 @@ const ShipmentDetailsModal = ({ shipment, onClose, onViewDocument }) => {
           </div>
         </div>
       </div>
+
+      {/* Trip Information Section - Add after cargoSection */}
+      <div style={styles.tripInfoSection}>
+        <h4 style={styles.tripInfoTitle}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ marginRight: '0.5rem', verticalAlign: 'middle' }}>
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke="#00ff41" strokeWidth="2"/>
+            <circle cx="12" cy="10" r="3" stroke="#00ff41" strokeWidth="2"/>
+          </svg>
+          Trip Information
+        </h4>
+        <div style={styles.tripInfoGrid}>
+          <div style={styles.tripInfoItem}>
+            <span style={styles.tripInfoLabel}>Route Distance:</span>
+            <span style={styles.tripInfoValue}>1,004 miles</span>
+          </div>
+          <div style={styles.tripInfoItem}>
+            <span style={styles.tripInfoLabel}>Drive Time:</span>
+            <span style={styles.tripInfoValue}>18.5 hours</span>
+          </div>
+          <div style={styles.tripInfoItem}>
+            <span style={styles.tripInfoLabel}>Fuel Economy:</span>
+            <span style={styles.tripInfoValue}>6.2 MPG</span>
+          </div>
+          <div style={styles.tripInfoItem}>
+            <span style={styles.tripInfoLabel}>Route Type:</span>
+            <span style={styles.tripInfoValue}>PC*MILER Practical</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -121,12 +150,63 @@ const ShipmentDetailsModal = ({ shipment, onClose, onViewDocument }) => {
       <div style={styles.trackingMap}>
         <div style={styles.mapHeader}>
           <h4 style={styles.mapTitle}>Live GPS Tracking</h4>
-          <div style={styles.trackingStatus}>
-            <div style={{
-              ...styles.trackingIndicator,
-              backgroundColor: '#00ff41'
-            }}></div>
-            <span style={styles.trackingText}>Live Tracking Active</span>
+          <div style={styles.mapControls}>
+            <button
+              style={styles.mapControl}
+              onClick={() => {
+                try {
+                  const mapInstance = window[`shipmentMap_${shipment?.id}`];
+                  if (mapInstance && typeof mapInstance.zoomIn === 'function') {
+                    mapInstance.zoomIn();
+                  } else if (mapInstance) {
+                    const currentZoom = mapInstance.getZoom();
+                    mapInstance.setZoom(currentZoom + 1);
+                  } else {
+                    console.warn('Modal shipment map not available for zoom control');
+                  }
+                } catch (error) {
+                  console.error('Error zooming in:', error);
+                }
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" strokeWidth="2"/>
+                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              +
+            </button>
+            <button
+              style={styles.mapControl}
+              onClick={() => {
+                try {
+                  const mapInstance = window[`shipmentMap_${shipment?.id}`];
+                  if (mapInstance && typeof mapInstance.zoomOut === 'function') {
+                    mapInstance.zoomOut();
+                  } else if (mapInstance) {
+                    const currentZoom = mapInstance.getZoom();
+                    mapInstance.setZoom(Math.max(currentZoom - 1, 1));
+                  } else {
+                    console.warn('Modal shipment map not available for zoom control');
+                  }
+                } catch (error) {
+                  console.error('Error zooming out:', error);
+                }
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
+                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              -
+            </button>
+            <div style={styles.trackingStatus}>
+              <div style={{
+                ...styles.trackingIndicator,
+                backgroundColor: '#00ff41'
+              }}></div>
+              <span style={styles.trackingText}>Live Tracking Active</span>
+            </div>
           </div>
         </div>
         
@@ -633,6 +713,39 @@ const styles = {
     color: '#e0e0e0',
     fontWeight: 500,
   },
+  tripInfoSection: {
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    border: '1px solid rgba(0, 255, 65, 0.1)',
+    borderRadius: '8px',
+    padding: '1rem',
+  },
+  tripInfoTitle: {
+    fontFamily: 'Orbitron, sans-serif',
+    fontSize: '1rem',
+    fontWeight: 600,
+    color: '#00ff41',
+    margin: '0 0 1rem 0',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  tripInfoGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '0.75rem',
+  },
+  tripInfoItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tripInfoLabel: {
+    color: '#999',
+    fontSize: '0.9rem',
+  },
+  tripInfoValue: {
+    color: '#e0e0e0',
+    fontWeight: 500,
+  },
   trackingMap: {
     backgroundColor: 'rgba(0, 255, 65, 0.03)',
     border: '1px solid rgba(0, 255, 65, 0.15)',
@@ -860,6 +973,26 @@ const styles = {
     fontSize: '0.8rem',
     fontWeight: 500,
     transition: 'all 0.3s ease',
+  },
+  mapControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  mapControl: {
+    backgroundColor: 'rgba(0, 255, 65, 0.1)',
+    border: '1px solid rgba(0, 255, 65, 0.3)',
+    borderRadius: '6px',
+    padding: '0.5rem',
+    color: '#00ff41',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+    fontSize: '0.8rem',
+    transition: 'all 0.3s ease',
+    minWidth: '36px',
+    justifyContent: 'center',
   },
 };
 
