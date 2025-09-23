@@ -14,7 +14,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
     totalShipments: 3,
     inTransit: 3,
     delivered: 0,
-    fleetUtilization: 87
+    carbonSavings: 38, // % Carbon Reduction using TCV Sprinter
   });
   const [showDocumentViewer, setShowDocumentViewer] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(null);
@@ -106,19 +106,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
     const pulseInterval = setInterval(() => {
       setShowPulse(prev => !prev);
     }, 2000);
-
-    // Simulate live data updates
-    const dataInterval = setInterval(() => {
-      setLiveData(prev => ({
-        ...prev,
-        fleetUtilization: 85 + Math.floor(Math.random() * 10)
-      }));
-    }, 5000);
-
-    return () => {
-      clearInterval(pulseInterval);
-      clearInterval(dataInterval);
-    };
+    return () => clearInterval(pulseInterval);
   }, []);
 
   // Add this useEffect after your existing useEffects
@@ -364,6 +352,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
           </div>
         </div>
 
+        {/* AFTER (Carbon Footprint Savings) */}
         <div style={styles.statCard}>
           <div style={styles.statIcon}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -372,8 +361,9 @@ const CustomerDashboard = ({ userData, onLogout }) => {
             </svg>
           </div>
           <div style={styles.statContent}>
-            <div style={styles.statValue}>{liveData.fleetUtilization}%</div>
-            <div style={styles.statLabel}>Fleet Utilization</div>
+            <div style={styles.statValue}>{liveData.carbonSavings}%</div>
+            <div style={styles.statLabel}>Carbon Footprint Savings</div>
+            <div style={styles.statSubLabel}>Using TCV Sprinter</div>
           </div>
         </div>
       </div>
@@ -467,7 +457,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
         </div>
         <div style={styles.mapContainer}>
           {/* Trimble Map with Fleet Overlay */}
-          <div style={{ position: 'relative' }}>
+          {/* ⬇️ Wrap the map + overlay in a clipped viewport */}
+          <div style={styles.mapViewport}>
             <LiveMap
               key="fleet-overview-map"
               shipment={mockShipments[0]} // Primary shipment for map centering
@@ -653,8 +644,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
             <span style={styles.mapStatValue}>3</span>
           </div>
           <div style={styles.mapStat}>
-            <span style={styles.mapStatLabel}>Fleet Utilization:</span>
-            <span style={styles.mapStatValue}>100%</span>
+            <span style={styles.mapStatLabel}>Carbon Footprint Savings:</span>
+            <span style={styles.mapStatValue}>{liveData.carbonSavings}%</span>
           </div>
         </div>
       </div>
@@ -1044,7 +1035,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.tripAnalyticItem}>
                 <div style={styles.analyticIcon}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#ff00ff" strokeWidth="2" />
+                    <path d="M14 14.76V3.5a2.5 2.5 0  0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#ff00ff" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.analyticDetails}>
@@ -1141,7 +1132,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               <div style={styles.documentItem}>
                 <div style={styles.documentIcon}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#ff00ff" strokeWidth="2" />
+                    <path d="M14 14.76V3.5a2.5 2.5 0  0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#ff00ff" strokeWidth="2" />
                   </svg>
                 </div>
                 <div style={styles.documentInfo}>
@@ -1457,6 +1448,11 @@ const styles = {
     fontSize: '0.9rem',
     color: '#999',
   },
+  statSubLabel: {
+    fontSize: '0.75rem',
+    color: '#7aa', // subtle, readable on dark background
+    marginTop: '2px',
+  },
   mapCard: {
     backgroundColor: 'rgba(0, 255, 65, 0.03)',
     border: '1px solid rgba(0, 255, 65, 0.15)',
@@ -1508,6 +1504,16 @@ const styles = {
     border: '1px solid rgba(0, 255, 65, 0.2)',
     marginBottom: '1rem',
     position: 'relative', // Added for positioning context
+    overflow: 'hidden',          // ⛔️ prevents any child overlays from spilling out
+    isolation: 'isolate',        // makes this a new stacking context
+  },
+  // New viewport to clip map + overlays
+  mapViewport: {
+    position: 'relative',
+    overflow: 'hidden',          // ⛔️ hard-clip markers, tooltips, legend to the map area
+    borderRadius: '8px',         // keep clipping consistent with the map’s rounded corners
+    isolation: 'isolate',        // ensure children can't stack over siblings outside
+    contain: 'layout paint',     // perf + guarantees paint stays inside
   },
   mapSvg: {
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
@@ -1967,7 +1973,7 @@ const styles = {
     width: '100%',
     height: '100%',
     pointerEvents: 'none', // Allow map interaction
-    zIndex: 10,
+    zIndex: 1,                   // stays above the canvas but below anything outside the viewport
   },
   truckMarker: {
     position: 'absolute',
@@ -1984,7 +1990,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     pointerEvents: 'auto', // Enable truck interaction
-    zIndex: 15,
+    zIndex: 2,                   // still above the map tiles/route, but clipped by the viewport
   },
   truckIcon: {
     width: '40px',
