@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import DocumentViewer from './DocumentViewer';
 import LiveMap from './LiveMap'; // This import is now used in the new map section
 import logoImage from '../imgs/FreightTrixHeader_Graphic.png';
@@ -20,9 +20,16 @@ const CustomerDashboard = ({ userData, onLogout }) => {
   const [currentDocument, setCurrentDocument] = useState(null);
   const [documentType, setDocumentType] = useState('');
 
+  // Map viewport and tooltip refs
+  const mapViewportRef = useRef(null);
+  const tooltipRef = useRef(null);
+  // Raw click coords (relative to viewport)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  // Final, clamped coords
+  const [tipCoords, setTipCoords] = useState({ left: 0, top: 0 });
+  const [tipPlacement, setTipPlacement] = useState('top'); // 'top' | 'bottom'
   // Add this state for tooltip management
   const [activeTooltip, setActiveTooltip] = useState(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
 
   // Add this state at the top of CustomerDashboard component:
   const [mapControlsReady, setMapControlsReady] = useState(false);
@@ -136,12 +143,10 @@ const CustomerDashboard = ({ userData, onLogout }) => {
         setActiveTooltip(null);
       }
     };
-    // Listen for map interactions
-    const mapContainer = document.querySelector('[style*="position: relative"]');
-    if (mapContainer) {
-      mapContainer.addEventListener('click', handleMapInteraction);
-      return () => mapContainer.removeEventListener('click', handleMapInteraction);
-    }
+    const node = mapViewportRef.current;
+    if (!node) return;
+    node.addEventListener('click', handleMapInteraction);
+    return () => node.removeEventListener('click', handleMapInteraction);
   }, [activeTooltip]);
 
   // Add this useEffect to check for map readiness:
@@ -158,6 +163,39 @@ const CustomerDashboard = ({ userData, onLogout }) => {
     const interval = setInterval(checkMapControls, 1000);
     return () => clearInterval(interval);
   }, [activeView]);
+
+  // clamp & flip logic (runs after tooltip mounts)
+  useLayoutEffect(() => {
+    if (!activeTooltip || !mapViewportRef.current) return;
+
+    // Run on next frame so the tooltip has layout
+    requestAnimationFrame(() => {
+      const viewRect = mapViewportRef.current.getBoundingClientRect();
+      const tipRect = tooltipRef.current?.getBoundingClientRect();
+
+      const margin = 12;
+      const w = tipRect?.width ?? 300; // fallbacks = your min/max
+      const h = tipRect?.height ?? 160;
+
+      // Default: center horizontally, show above the click
+      let left = tooltipPosition.x - w / 2;
+      let top = tooltipPosition.y - h - 14;
+      let placement = 'top';
+
+      // Flip below if not enough room above
+      if (top < margin) {
+        top = tooltipPosition.y + 14;
+        placement = 'bottom';
+      }
+
+      // Clamp to viewport
+      left = Math.max(margin, Math.min(left, viewRect.width - w - margin));
+      top = Math.max(margin, Math.min(top, viewRect.height - h - margin));
+
+      setTipCoords({ left, top });
+      setTipPlacement(placement);
+    });
+  }, [activeTooltip, tooltipPosition]);
 
   const handleShipmentSelect = (shipment) => {
     setSelectedShipment(shipment);
@@ -234,9 +272,8 @@ const CustomerDashboard = ({ userData, onLogout }) => {
       setActiveTooltip(null);
       setSelectedRouteShipment(null);
     } else {
-      // Get click position relative to the map container
-      const mapContainer = event.currentTarget.closest('[style*="position: relative"]');
-      const rect = mapContainer.getBoundingClientRect();
+      // Get click position relative to the CLIPPED MAP VIEWPORT
+      const rect = mapViewportRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
@@ -257,9 +294,9 @@ const CustomerDashboard = ({ userData, onLogout }) => {
   const getRealisticMapPosition = (location) => {
     // Map real locations to approximate pixel positions on a 1200x400 US map
     const locationMap = {
-      'Des Moines, IA': { x: 520, y: 180 },     // Chicago to Denver route
-      'Tallahassee, FL': { x: 700, y: 350 },     // Houston to Miami route
-      'Grants Pass, OR': { x: 100, y: 140 },     // Los Angeles to Seattle route
+      'Des Moines, IA': { x: 520, y: 180 }, // Chicago to Denver route
+      'Tallahassee, FL': { x: 700, y: 350 }, // Houston to Miami route
+      'Grants Pass, OR': { x: 100, y: 140 }, // Los Angeles to Seattle route
       'Chicago, IL': { x: 560, y: 160 },
       'Denver, CO': { x: 360, y: 220 },
       'Houston, TX': { x: 420, y: 320 },
@@ -458,7 +495,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
         <div style={styles.mapContainer}>
           {/* Trimble Map with Fleet Overlay */}
           {/* ⬇️ Wrap the map + overlay in a clipped viewport */}
-          <div style={styles.mapViewport}>
+          <div style={styles.mapViewport} ref={mapViewportRef}>
             <LiveMap
               key="fleet-overview-map"
               shipment={mockShipments[0]} // Primary shipment for map centering
@@ -468,7 +505,7 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               selectedRouteShipment={selectedRouteShipment} // Pass selected route shipment
               onMapLoad={positionTrucksOnMap}
             />
-            {/* Fleet Overlay Container */}
+            {/* Fleet Overlay Interactive */}
             <div style={styles.fleetOverlayInteractive}>
               {/* Main active shipments with truck icons - ONLY these three */}
               {mockShipments.map((shipment, index) => {
@@ -524,11 +561,15 @@ const CustomerDashboard = ({ userData, onLogout }) => {
               {/* Dynamic Tooltip */}
               {activeTooltip && (
                 <div
+                  ref={tooltipRef}
                   style={{
                     ...styles.dynamicTooltip,
-                    left: `${tooltipPosition.x}px`,
-                    top: `${tooltipPosition.y}px`,
+                    left: `${tipCoords.left}px`,
+                    top: `${tipCoords.top}px`,
+                    transform: 'none',     // override default translate
+                    animation: 'none'      // avoid translate-based keyframe
                   }}
+                  data-placement={tipPlacement}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {(() => {
@@ -1058,19 +1099,6 @@ const CustomerDashboard = ({ userData, onLogout }) => {
                   <div style={styles.analyticSubtext}>Real-time GPS & route guidance</div>
                 </div>
               </div>
-              <div style={styles.tripAnalyticItem}>
-                <div style={styles.analyticIcon}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="3" stroke="#ff00ff" strokeWidth="2" />
-                    <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24" stroke="#ff00ff" strokeWidth="2" />
-                  </svg>
-                </div>
-                <div style={styles.analyticDetails}>
-                  <div style={styles.analyticLabel}>Alt Routes</div>
-                  <div style={styles.analyticValue}>2 Available</div>
-                  <div style={styles.analyticSubtext}>+12 min, +31 min options</div>
-                </div>
-              </div>
               {/* Update the Advanced Trip Analytics section */}
               <div style={styles.tripAnalyticItem}>
                 <div style={styles.analyticIcon}>
@@ -1276,6 +1304,9 @@ const CustomerDashboard = ({ userData, onLogout }) => {
           button:hover {
             opacity: 0.8;
           }
+
+          /* New keyframes for fadeIn */
+          @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
         `}
       </style>
     </div>
@@ -1504,16 +1535,16 @@ const styles = {
     border: '1px solid rgba(0, 255, 65, 0.2)',
     marginBottom: '1rem',
     position: 'relative', // Added for positioning context
-    overflow: 'hidden',          // ⛔️ prevents any child overlays from spilling out
-    isolation: 'isolate',        // makes this a new stacking context
+    overflow: 'hidden', // ⛔️ prevents any child overlays from spilling out
+    isolation: 'isolate', // makes this a new stacking context
   },
   // New viewport to clip map + overlays
   mapViewport: {
     position: 'relative',
-    overflow: 'hidden',          // ⛔️ hard-clip markers, tooltips, legend to the map area
-    borderRadius: '8px',         // keep clipping consistent with the map’s rounded corners
-    isolation: 'isolate',        // ensure children can't stack over siblings outside
-    contain: 'layout paint',     // perf + guarantees paint stays inside
+    overflow: 'hidden', // ⛔️ hard-clip markers, tooltips, legend to the map area
+    borderRadius: '8px', // keep clipping consistent with the map’s rounded corners
+    isolation: 'isolate', // ensure children can't stack over siblings outside
+    contain: 'layout paint', // perf + guarantees paint stays inside
   },
   mapSvg: {
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
@@ -1973,7 +2004,7 @@ const styles = {
     width: '100%',
     height: '100%',
     pointerEvents: 'none', // Allow map interaction
-    zIndex: 1,                   // stays above the canvas but below anything outside the viewport
+    zIndex: 1, // stays above the canvas but below anything outside the viewport
   },
   truckMarker: {
     position: 'absolute',
@@ -1990,7 +2021,7 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     pointerEvents: 'auto', // Enable truck interaction
-    zIndex: 2,                   // still above the map tiles/route, but clipped by the viewport
+    zIndex: 2, // still above the map tiles/route, but clipped by the viewport
   },
   truckIcon: {
     width: '40px',
@@ -2130,10 +2161,9 @@ const styles = {
     position: 'absolute',
     zIndex: 1000,
     pointerEvents: 'auto', // Keep tooltip interactive
-    transform: 'translate(-50%, -120%)',
     minWidth: '280px',
     maxWidth: '320px',
-    animation: 'slideIn 0.3s ease-out',
+    animation: 'fadeIn 140ms ease-out',
   },
   tooltipContent: {
     background: 'rgba(13, 2, 8, 0.95)',
